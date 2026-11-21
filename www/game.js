@@ -2,6 +2,7 @@
 // Idea y diseño: Víctor. Código: Three.js (sin bundler, se carga directo).
 import * as THREE from './lib/three.module.js';
 import { PILOTOS, USO_IA, crearEspeciales } from './especiales.js';
+import { PIEZAS, RANURAS, tienda, guardarTienda, sumarGemas, comprar, GEMAS_POR_DERRIBO, GEMAS_POR_CRISTAL } from './tienda.js';
 
 // ============================================================
 // AJUSTES (se guardan en el teléfono)
@@ -158,7 +159,7 @@ function crearAsteroides() {
 // ============================================================
 // MODELO DE LA NAVE (como el dibujo: ala triangular, cabina negra, fuego atrás)
 // ============================================================
-function crearModeloNave(color, acento) {
+function crearModeloNave(color, acento, equipo) {
   const g = new THREE.Group();
   const matCuerpo = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.6, metalness: 0.2 });
   const matOscuro = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.3, metalness: 0.5 });
@@ -202,7 +203,51 @@ function crearModeloNave(color, acento) {
   g.add(fuego);
   g.userData.fuego = fuego;
   g.userData.materiales = [matCuerpo];
+  if (equipo) agregarPiezas(g, equipo);
   return g;
+}
+
+// Piezas compradas en la tienda (se ven en la nave)
+function agregarPiezas(g, eq) {
+  if (eq.elitras) {
+    const colores = { simples: 0xffffff, protectoras: 0xffd83b, pesadas: 0x5a5560 };
+    const col = colores[eq.elitras];
+    const grosor = eq.elitras === 'pesadas' ? 0.6 : 0.18;
+    for (const lado of [-1, 1]) {
+      const forma = new THREE.Shape();
+      forma.moveTo(0, 2.2); forma.lineTo(lado * 3.4, -1.6); forma.lineTo(lado * 0.6, -1.0); forma.closePath();
+      const geo = new THREE.ExtrudeGeometry(forma, { depth: grosor, bevelEnabled: false });
+      geo.rotateX(Math.PI / 2);
+      const el = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: col, flatShading: true, side: THREE.DoubleSide, metalness: eq.elitras === 'pesadas' ? 0.6 : 0.1 }));
+      el.position.set(lado * 0.6, 0.75 + grosor, -0.2);
+      el.rotation.z = lado * 0.22;
+      g.add(el);
+      // raya azul como en el dibujo
+      const raya = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, 0.28), new THREE.MeshBasicMaterial({ color: 0x2f8fff }));
+      raya.position.set(lado * 2.1, 0.95 + grosor * 2 + Math.abs(lado) * 0.35, -0.5); raya.rotation.set(0, lado * 0.55, lado * 0.22);
+      g.add(raya);
+    }
+  }
+  if (eq.tirador) {
+    const matC = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, metalness: 0.6, roughness: 0.4 });
+    const matP = new THREE.MeshBasicMaterial({ color: 0xffd83b });
+    const xs = eq.tirador === 'triple' ? [-2.6, 0, 2.6] : [-1.5, 1.5];
+    const largo = eq.tirador === 'rapido' ? 3.6 : 2.4;
+    for (const x of xs) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, largo, 8), matC);
+      c.rotation.x = Math.PI / 2; c.position.set(x, x === 0 ? 1.1 : 0.1, 1.2 + largo / 2 - 0.6); g.add(c);
+      const pt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.3, 8), matP);
+      pt.rotation.x = Math.PI / 2; pt.position.set(x, c.position.y, c.position.z + largo / 2); g.add(pt);
+    }
+  }
+}
+
+// Equipo que realmente puede usar (solo piezas compradas)
+function equipoValido() {
+  const eq = { ...tienda.equipo };
+  for (const k of ['elitras', 'tirador']) if (eq[k] && !tienda.compradas.includes(eq[k])) eq[k] = null;
+  if (eq.central && !PILOTOS.some(p => p.id === eq.central)) eq.central = null;
+  return eq;
 }
 
 // ============================================================
@@ -214,8 +259,10 @@ let jugador = null;
 class Nave {
   constructor(piloto, esJugador, nombre) {
     this.piloto = piloto; this.nombre = nombre || piloto.nombre; this.esJugador = esJugador;
-    this.color = esJugador ? 0xf2f2f2 : piloto.color;
-    this.modelo = crearModeloNave(this.color, piloto.acento);
+    this.equipo = esJugador ? equipoValido() : {};
+    const central = this.equipo.central ? pilotoPorId(this.equipo.central) : null;
+    this.color = esJugador ? (central ? central.color : 0xf2f2f2) : piloto.color;
+    this.modelo = crearModeloNave(this.color, central ? central.acento : piloto.acento, this.equipo);
     this.obj = new THREE.Group(); this.obj.add(this.modelo); scene.add(this.obj);
     this.obj.rotation.order = 'YXZ';
     this.pos = this.obj.position;
@@ -226,6 +273,17 @@ class Nave {
     this.vidas = ajustes.vidas; this.tReaparecer = 0;
     this.cdEspecial = esJugador ? 2 : 4 + Math.random() * 6;
     this.lento = 0;
+    // efectos de las piezas
+    this.defensa = 1;
+    if (this.equipo.elitras === 'simples') this.velocidad *= 1.25;
+    if (this.equipo.elitras === 'pesadas') { this.velocidad *= 0.8; this.defensa = 0.5; }
+    this.municion = 40; this.recargando = 0;
+    this.escudo = 0; this.cdEscudo = 0;
+    if (this.equipo.elitras === 'protectoras') {
+      this.burbuja = new THREE.Mesh(new THREE.SphereGeometry(6.5, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
+      this.burbuja.visible = false; this.obj.add(this.burbuja);
+    }
     this.vivo = true; this.cdDisparo = 0; this.invulnerable = 0;
     this.turbo = 1; this.usandoTurbo = false;
     this.derribos = 0;
@@ -304,7 +362,7 @@ function disparar(nave, dirApuntada) {
     dir.x += (Math.random() - 0.5) * 0.06; dir.y += (Math.random() - 0.5) * 0.06; dir.z += (Math.random() - 0.5) * 0.06;
     dir.normalize();
   }
-  const lados = esJ ? [-2.6, 2.6] : [0];
+  const lados = !esJ ? [0] : nave.equipo.tirador === 'triple' ? [-2.6, 0, 2.6] : [-2.6, 2.6];
   for (const lado of lados) {
     const m = new THREE.Mesh(geoBala, esJ ? matBalaJ : matBalaE);
     nave.obj.updateMatrixWorld();
@@ -368,7 +426,7 @@ const especiales = crearEspeciales({ scene, naves, asteroides, danar, explosion,
 // ============================================================
 // CONTROLES TÁCTILES + TECLADO
 // ============================================================
-const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false };
+const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false, escudo: false };
 const teclas = {};
 {
   const zona = $('joyZona'), base = $('joy'), knob = $('knob');
@@ -395,11 +453,13 @@ const teclas = {};
   boton($('btnTurbo'), () => input.turbo = true, () => input.turbo = false);
   boton($('btnGiro'), () => hacerGiro(), null);
   boton($('btnEspecial'), () => input.especial = true, null);
+  boton($('btnEscudo'), () => input.escudo = true, null);
 }
 window.addEventListener('keydown', (e) => {
   teclas[e.code] = true;
   if (e.code === 'KeyE' || e.code === 'KeyQ') hacerGiro();
   if (e.code === 'KeyF' || e.code === 'KeyR') input.especial = true;
+  if (e.code === 'KeyG') input.escudo = true;
   if (e.code === 'Escape' && estado === 'jugando') irAlMenu();
 });
 window.addEventListener('keyup', (e) => { teclas[e.code] = false; });
@@ -416,7 +476,7 @@ function hacerGiro() {
 // ESTADO DEL JUEGO
 // ============================================================
 let estado = 'titulo';
-let totalPersonas = 0, tFin = 0;
+let totalPersonas = 0, tFin = 0, gemasPartida = 0;
 let objetivoFijado = null;
 
 function mostrar(id) {
@@ -451,7 +511,10 @@ function nuevaPartida() {
   }
   totalPersonas = ajustes.rivales + 1;
   jugador.invulnerable = 3;
-  tFin = 0;
+  tFin = 0; gemasPartida = 0;
+  crearCristales();
+  $('btnEscudo').style.display = jugador.burbuja ? '' : 'none';
+  $('municion').style.display = jugador.equipo.tirador === 'rapido' ? '' : 'none';
   $('feed').innerHTML = '';
   $('mensaje').textContent = '¡A LUCHAR!';
   setTimeout(() => { if ($('mensaje').textContent === '¡A LUCHAR!') $('mensaje').textContent = ''; }, 1500);
@@ -463,6 +526,7 @@ function nuevaPartida() {
 
 function irAlMenu() {
   estado = 'menu';
+  $('gemasMenu').textContent = `💎 ${tienda.gemas}`;
   input.fuego = input.turbo = false;
   mostrar('menu');
 }
@@ -482,7 +546,8 @@ function avisar(texto) {
 
 function danar(nave, cant, atacante, silencioso) {
   if (!nave.vivo || nave.invulnerable > 0) return;
-  nave.hp -= cant;
+  if (nave.escudo > 0) return;
+  nave.hp -= cant * nave.defensa;
   if (nave.esJugador && !silencioso) sonido('golpe');
   if (nave.hp <= 0) {
     nave.hp = 0; nave.vivo = false; nave.obj.visible = false;
@@ -490,6 +555,10 @@ function danar(nave, cant, atacante, silencioso) {
     const dist = jugador ? nave.pos.distanceTo(jugador.pos) : 0;
     sonido('explosion', nave.esJugador ? 1 : Math.max(0.15, 1 - dist / 400));
     if (atacante) atacante.derribos++;
+    if (atacante && atacante.esJugador && !nave.esJugador) {
+      sumarGemas(GEMAS_POR_DERRIBO); gemasPartida += GEMAS_POR_DERRIBO;
+      avisar(`+${GEMAS_POR_DERRIBO} 💎`);
+    }
     const quien = atacante ? atacante.nombre : 'un asteroide';
     nave.vidas--;
     if (nave.vidas > 0) nave.tReaparecer = 2.5;
@@ -508,9 +577,10 @@ function terminar(gano) {
   estado = 'fin';
   const puesto = personasVivas() + (gano ? 0 : 1);
   $('finTitulo').textContent = gano ? '¡GANASTE!' : 'FIN DEL JUEGO';
-  $('finTexto').innerHTML = gano
+  $('finTexto').innerHTML = (gano
     ? `Fuiste el último en pie.<br>Derribos: ${jugador.derribos}`
-    : `Quedaste en el puesto #${puesto} de ${totalPersonas}<br>Derribos: ${jugador.derribos}`;
+    : `Quedaste en el puesto #${puesto} de ${totalPersonas}<br>Derribos: ${jugador.derribos}`) +
+    `<br>💎 Gemas ganadas: ${gemasPartida} (tienes ${tienda.gemas})`;
   mostrar('fin');
 }
 
@@ -640,15 +710,28 @@ function actualizarJugador(dt) {
     }
   }
 
+  // escudo (élitras protectoras)
+  j.cdEscudo -= dt;
+  if (j.escudo > 0) { j.escudo -= dt; if (j.escudo <= 0) j.burbuja.visible = false; else j.burbuja.material.opacity = 0.2 + Math.sin(performance.now() / 80) * 0.08; }
+  if (input.escudo) {
+    input.escudo = false;
+    if (j.burbuja && j.cdEscudo <= 0) { j.escudo = 4; j.cdEscudo = 15; j.burbuja.visible = true; sonido('turbo'); }
+  }
+
+  // tirador rápido: hay que recargar
+  const rapido = j.equipo.tirador === 'rapido';
+  if (j.recargando > 0) { j.recargando -= dt; if (j.recargando <= 0) j.municion = 40; }
+
   j.cdDisparo -= dt;
-  if (fuego && j.cdDisparo <= 0) {
+  if (fuego && j.cdDisparo <= 0 && j.recargando <= 0) {
     let dir = null;
     if (objetivoFijado) {
       const d = objetivoFijado.pos.distanceTo(j.pos);
       dir = _v2.copy(objetivoFijado.pos).addScaledVector(objetivoFijado.vel, d / 280).sub(j.pos).normalize();
     }
     disparar(j, dir);
-    j.cdDisparo = 0.16;
+    j.cdDisparo = rapido ? 0.06 : 0.16;
+    if (rapido && --j.municion <= 0) { j.recargando = 1.8; sonido('turbo'); }
   }
 }
 
@@ -732,6 +815,56 @@ function actualizarHUD() {
   btnE.style.setProperty('--carga', pct + '%');
   btnE.classList.toggle('listo', listo);
   $('turboFill').style.width = (jugador.turbo * 100) + '%';
+  $('gemasHud').textContent = `💎 ${tienda.gemas}`;
+  if (jugador.burbuja) {
+    const b = $('btnEscudo'), listoE = jugador.cdEscudo <= 0;
+    b.style.setProperty('--carga', (listoE ? 100 : 100 - jugador.cdEscudo / 15 * 100) + '%');
+    b.classList.toggle('listo', listoE);
+  }
+  if (jugador.equipo.tirador === 'rapido') $('municion').textContent = jugador.recargando > 0 ? 'RECARGANDO' : `${jugador.municion}/40`;
+}
+
+// ============================================================
+// GEMAS FLOTANDO EN LA PARTIDA
+// ============================================================
+const cristales = [];
+const geoCristal = new THREE.OctahedronGeometry(1.8, 0);
+const matCristal = new THREE.MeshBasicMaterial({ color: 0x5cffe0 });
+const matCristalBorde = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+let tNuevoCristal = 0;
+function nuevoCristal() {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(geoCristal, matCristal));
+  const b = new THREE.Mesh(geoCristal, matCristalBorde); b.scale.setScalar(1.08); g.add(b);
+  g.scale.set(1, 1.6, 1);
+  let p;
+  do { p = new THREE.Vector3().randomDirection().multiplyScalar(60 + Math.random() * (R - 120)); }
+  while (asteroides.some(a => a.mesh.position.distanceTo(p) < a.r + 6));
+  g.position.copy(p);
+  scene.add(g);
+  cristales.push({ g, base: p.y, fase: Math.random() * 6 });
+}
+function crearCristales() {
+  for (const c of cristales) scene.remove(c.g);
+  cristales.length = 0;
+  for (let i = 0; i < 10; i++) nuevoCristal();
+  tNuevoCristal = 8;
+}
+function actualizarCristales(dt) {
+  const t = performance.now() / 1000;
+  for (let i = cristales.length - 1; i >= 0; i--) {
+    const c = cristales[i];
+    c.g.rotation.y += dt * 2;
+    c.g.position.y = c.base + Math.sin(t * 2 + c.fase) * 1.5;
+    if (jugador.vivo && jugador.pos.distanceTo(c.g.position) < 9) {
+      scene.remove(c.g); cristales.splice(i, 1);
+      sumarGemas(GEMAS_POR_CRISTAL); gemasPartida += GEMAS_POR_CRISTAL;
+      explosion(c.g.position.clone(), false, 0x5cffe0);
+      sonido('click'); avisar(`+${GEMAS_POR_CRISTAL} 💎`);
+    }
+  }
+  tNuevoCristal -= dt;
+  if (tNuevoCristal <= 0) { tNuevoCristal = 8; if (cristales.length < 10) nuevoCristal(); }
 }
 
 const hud2d = $('hud2d'), ctx = hud2d.getContext('2d');
@@ -843,6 +976,7 @@ function bucle(ahora) {
     }
     for (const n of naves) if (!n.esJugador && n.vivo) actualizarIA(n, dt);
     especiales.actualizar(dt);
+    actualizarCristales(dt);
     actualizarBalas(dt);
     choquesNaves();
     if (jugador.vivo) posicionarCamara(false, dt);
@@ -861,7 +995,10 @@ function bucle(ahora) {
     camera.lookAt(0, 0, 0);
   }
   actualizarEfectos(dt);
-  renderer.render(scene, camera);
+  if (estado === 'editor') {
+    if (modeloPreview) modeloPreview.rotation.y += dt * 0.6;
+    renderer.render(escenaPreview, camPreview);
+  } else renderer.render(scene, camera);
   dibujarHUD2D();
 }
 crearAsteroides();
@@ -911,7 +1048,7 @@ $('btnSalir').addEventListener('click', () => {
 {
   const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
   if (App) App.addListener('backButton', () => {
-    if (estado === 'jugando' || estado === 'fin') irAlMenu();
+    if (estado === 'jugando' || estado === 'fin' || estado === 'editor' || estado === 'tienda') irAlMenu();
     else if (estado === 'menu') { estado = 'titulo'; mostrar('titulo'); }
     else App.exitApp();
   });
@@ -976,3 +1113,105 @@ function descargarActualizacion() {
 
 $('btnActualizar').addEventListener('click', () => { iniciarAudio(); sonido('click'); buscarActualizacion(true); });
 buscarActualizacion(false); // revisa sola al abrir el juego
+
+// ============================================================
+// EDITAR NAVE
+// ============================================================
+const escenaPreview = new THREE.Scene();
+escenaPreview.background = new THREE.Color(0xffffff);
+escenaPreview.add(new THREE.HemisphereLight(0xffffff, 0x8a7a96, 1.6));
+{ const l = new THREE.DirectionalLight(0xffffff, 1.8); l.position.set(5, 10, 6); escenaPreview.add(l); }
+const camPreview = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camPreview.position.set(9, 8, 12); camPreview.lookAt(0, 0, 0);
+let modeloPreview = null;
+
+function nombreOpcion(ranura, id) {
+  if (ranura === 'central') return id ? `Nave de ${pilotoPorId(id).nombre}` : 'Nave blanca';
+  if (!id) return ranura === 'tirador' ? 'Normal' : 'Ninguna';
+  return (PIEZAS[ranura].find(p => p.id === id) || {}).nombre || id;
+}
+function opciones(ranura) {
+  if (ranura === 'central') return [null, ...PILOTOS.map(p => p.id)];
+  return [null, ...PIEZAS[ranura].filter(p => tienda.compradas.includes(p.id)).map(p => p.id)];
+}
+function pintarEditor() {
+  const eq = equipoValido();
+  for (const r of RANURAS) {
+    const el = document.querySelector(`#ranuras [data-ranura="${r.id}"] .valor`);
+    if (!el) continue;
+    if (r.pronto) { el.textContent = 'PRONTO'; continue; }
+    const ops = opciones(r.id);
+    el.textContent = nombreOpcion(r.id, eq[r.id]) + (ops.length <= 1 ? ' (compra en la TIENDA)' : '');
+  }
+  if (modeloPreview) escenaPreview.remove(modeloPreview);
+  const central = eq.central ? pilotoPorId(eq.central) : null;
+  modeloPreview = crearModeloNave(central ? central.color : 0xf2f2f2, central ? central.acento : pilotoPorId(ajustes.piloto).acento, eq);
+  modeloPreview.userData.fuego.visible = false;
+  escenaPreview.add(modeloPreview);
+  // la nave se ve en la mitad izquierda de la pantalla
+  const w = window.innerWidth, h = window.innerHeight;
+  camPreview.aspect = w / h; camPreview.setViewOffset(w, h, w * 0.22, 0, w, h); camPreview.updateProjectionMatrix();
+}
+function abrirEditor() { estado = 'editor'; mostrar('editor'); pintarEditor(); }
+
+{
+  const cont = $('ranuras');
+  cont.innerHTML = RANURAS.map(r => `
+    <div class="ranura${r.pronto ? ' pronto' : ''}" data-ranura="${r.id}">
+      <div class="ranura-nombre">${r.nombre}</div>
+      <div class="ranura-fila"><b class="fl" data-d="-1">&lt;</b><span class="valor"></span><b class="fl" data-d="1">&gt;</b></div>
+    </div>`).join('');
+  for (const fl of cont.querySelectorAll('.fl')) {
+    fl.addEventListener('click', () => {
+      const r = fl.closest('.ranura').dataset.ranura;
+      if (RANURAS.find(x => x.id === r).pronto) return;
+      sonido('click');
+      const ops = opciones(r);
+      const actual = equipoValido()[r];
+      const i = Math.max(0, ops.indexOf(actual));
+      tienda.equipo[r] = ops[(i + Number(fl.dataset.d) + ops.length) % ops.length];
+      guardarTienda(); pintarEditor();
+    });
+  }
+}
+$('btnEditar').addEventListener('click', () => { iniciarAudio(); sonido('click'); abrirEditor(); });
+$('btnVolverEditor').addEventListener('click', () => { sonido('click'); irAlMenu(); });
+$('btnEditorTienda').addEventListener('click', () => { sonido('click'); abrirTienda(); });
+
+// ============================================================
+// TIENDA
+// ============================================================
+function pintarTienda() {
+  $('gemasTienda').textContent = `💎 ${tienda.gemas}`;
+  $('gemasMenu').textContent = `💎 ${tienda.gemas}`;
+  const items = [...PIEZAS.elitras.map(p => ['elitras', p]), ...PIEZAS.tirador.map(p => ['tirador', p])];
+  $('productos').innerHTML = items.map(([r, p]) => {
+    const tiene = tienda.compradas.includes(p.id);
+    const alcanza = tienda.gemas >= p.precio;
+    return `<div class="producto${tiene ? ' tiene' : ''}">
+      <div class="prod-nombre">${p.nombre}</div>
+      <div class="prod-desc">${p.desc}</div>
+      <button class="prod-btn${!tiene && !alcanza ? ' falta' : ''}" data-id="${p.id}" data-r="${r}">${tiene ? 'COMPRADO ✓' : `💎 ${p.precio}`}</button>
+    </div>`;
+  }).join('');
+  for (const b of $('productos').querySelectorAll('.prod-btn')) {
+    b.addEventListener('click', () => {
+      const p = PIEZAS[b.dataset.r].find(x => x.id === b.dataset.id);
+      if (tienda.compradas.includes(p.id)) return;
+      if (comprar(p)) {
+        sonido('explosion', 0.3); sonido('click');
+        tienda.equipo[b.dataset.r] = p.id; guardarTienda(); // se equipa sola
+        $('avisoTienda').textContent = `¡Compraste ${p.nombre}! Ya está puesta en tu nave.`;
+      } else {
+        sonido('golpe');
+        $('avisoTienda').textContent = `Te faltan ${p.precio - tienda.gemas} 💎. Derriba rivales (+${GEMAS_POR_DERRIBO}) y junta cristales (+${GEMAS_POR_CRISTAL}).`;
+      }
+      pintarTienda();
+    });
+  }
+}
+function abrirTienda() { estado = 'tienda'; $('avisoTienda').textContent = ''; mostrar('tienda'); pintarTienda(); }
+$('btnTienda').addEventListener('click', () => { iniciarAudio(); sonido('click'); abrirTienda(); });
+$('btnVolverTienda').addEventListener('click', () => { sonido('click'); irAlMenu(); });
+$('btnTiendaEditor').addEventListener('click', () => { sonido('click'); abrirEditor(); });
+pintarTienda();

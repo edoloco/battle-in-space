@@ -24,14 +24,20 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 | Piloto | Especial |
 |---|---|
 | Víctor | Tornado donde mira: chupa y daña a los que atrapa |
-| Ms. Pussles | Rayos donde apunta: saltan de un rival a otro |
-| Wap | Big Bomb: bomba con explosión gigante |
-| Big Bad | Montón de huesos donde apunta |
+| Ms. Pussles | Rayos donde apunta: 3 descargas, en abanico y saltando de rival en rival |
+| Wap | Big Bomb verde: explota y suelta más bombas verdes |
+| Big Bad | Montón de huesos donde apunta (3 oleadas) |
 | Hum-ater-ed Storm | Misil gigante de wither que persigue |
 | Sumperlake | Láser donde apunta |
 | Tentaclesilla Storm | Rayo enredante: atrapa, frena y daña de a poco a los que están cerca |
 
-En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial.
+En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, G escudo.
+
+## Gemas, tienda y editor de nave
+
+- Ganas **5 💎** por cada rival que derribas y **2 💎** por cada cristal que encuentras flotando en la partida.
+- **Tienda:** Élitras simples (100, más rápida) · Élitras protectoras (309, botón 🛡 de escudo por 4 s) · Élitras pesadas (500, más lenta pero recibe la mitad del daño) · Tirador de fuego triple (260, tres láseres) · Tirador de fuego rápido (100, muy rápido pero recarga cada 40 tiros).
+- **Editar nave:** élitras, zona central (la nave de cualquier piloto), tirador de fuego y misiles (pronto).
 
 ## Cómo está hecho
 

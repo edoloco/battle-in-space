@@ -32,6 +32,10 @@
       <div class="bar opt"><span><b class="flecha" data-opt="vidas" data-d="-1">&lt;</b> VIDAS <i id="vVidas">5</i> <b class="flecha" data-opt="vidas" data-d="1">&gt;</b></span></div>
       <div class="bar opt"><span><b class="flecha" data-opt="rivales" data-d="-1">&lt;</b> RIVALES <i id="vRivales">10</i> <b class="flecha" data-opt="rivales" data-d="1">&gt;</b></span></div>
     </div>
+    <div class="fila">
+      <button class="bar opt editar" id="btnEditar"><span>EDITAR NAVE</span></button>
+      <button class="bar opt tiendaBtn" id="btnTienda"><span>TIENDA <i id="gemasMenu">💎 0</i></span></button>
+    </div>
     <button class="bar opt actualizar" id="btnActualizar"><span id="txtActualizar">BUSCAR ACTUALIZACIONES</span></button>
     <button class="bar salir" id="btnSalir"><span>SALIR DEL JUEGO</span></button>
   </div>
@@ -45,6 +49,7 @@
     <div id="vivas">11/11<br><small>PERSONAS VIVAS</small></div>
     <div id="derribos">DERRIBOS 0</div>
     <div id="corazones"></div>
+    <div id="gemasHud">💎 0</div>
   </div>
   <button class="cerrar" id="btnCerrar">✕</button>
   <div id="feed"></div>
@@ -53,6 +58,8 @@
   <div id="joyZona"><div id="joy"><div class="arrows">‹ ›</div><div id="knob"></div></div></div>
 
   <button id="btnEspecial" class="redondo especial">‹ϟ›</button>
+  <button id="btnEscudo" class="redondo especial">🛡</button>
+  <div id="municion"></div>
   <div id="botones">
     <button id="btnFuego" class="redondo grande">✦<i></i><i></i></button>
     <div id="turboBar"><div id="turboFill"></div></div>
@@ -61,6 +68,26 @@
       <button id="btnGiro" class="redondo">⟲</button>
     </div>
   </div>
+</section>
+
+<!-- EDITAR NAVE -->
+<section id="editor" class="screen">
+  <button class="volver" id="btnVolverEditor">← VOLVER</button>
+  <div class="titulo-pantalla">EDITAR NAVE</div>
+  <div class="linea-azul"></div>
+  <div class="panel-editor">
+    <div id="ranuras"></div>
+    <button class="bar opt tiendaBtn" id="btnEditorTienda"><span>IR A LA TIENDA</span></button>
+  </div>
+</section>
+
+<!-- TIENDA -->
+<section id="tienda" class="screen">
+  <button class="volver" id="btnVolverTienda">← VOLVER</button>
+  <div class="titulo-pantalla claro">TIENDA <span id="gemasTienda">💎 0</span></div>
+  <button class="volver derecha" id="btnTiendaEditor">EDITAR NAVE →</button>
+  <div id="productos"></div>
+  <div id="avisoTienda"></div>
 </section>
 
 <!-- FIN DE PARTIDA -->

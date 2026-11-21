@@ -40,18 +40,18 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 }
 .logo {
   margin: 0; font-family: Roboto, Arial, sans-serif; font-weight: 900;
-  color: #8b4fa3; font-size: clamp(22px, 9vh, 64px); text-align: center; letter-spacing: -1px;
+  color: #8b4fa3; font-size: clamp(20px, 7.5vh, 56px); line-height: 1; text-align: center; letter-spacing: -1px;
 }
 .bar {
   display: flex; align-items: center; justify-content: center;
   transform: skewX(-28deg); border-radius: 10px;
   background: #9d33c4; color: #111; font-size: clamp(13px, 4.4vh, 28px);
-  min-height: 9vh; padding: 0 2vw; position: relative;
+  min-height: 8vh; padding: 0 2vw; position: relative;
 }
 .bar > span { transform: skewX(28deg); display: block; white-space: nowrap; }
-.bar.jugar { background: #e8a6ff; font-size: clamp(18px, 7vh, 46px); min-height: 13vh; }
+.bar.jugar { background: #e8a6ff; font-size: clamp(18px, 7vh, 46px); min-height: 11vh; }
 .bar.jugar:active { background: #f6d6ff; }
-.bar.salir { background: #4e0a66; color: #fff; font-size: clamp(16px, 6vh, 40px); min-height: 12vh; }
+.bar.salir { background: #4e0a66; color: #fff; font-size: clamp(16px, 5.5vh, 38px); min-height: 10vh; }
 .fila { display: flex; gap: 2vw; }
 .fila .bar { flex: 1; }
 .flecha { font-style: normal; padding: 0 2.5vw; font-size: 1.2em; }
@@ -134,3 +134,53 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 }
 #btnEspecial.listo { color: #fff; box-shadow: 0 0 2.5vh #e89cff; animation: latido 1s infinite; }
 @keyframes latido { 50% { transform: scale(1.07); } }
+
+/* ---------- menú: editar / tienda ---------- */
+.bar.editar { background: #b86ad8; }
+.bar.tiendaBtn { background: #ffd83b; }
+.bar.tiendaBtn i { font-style: normal; font-family: sans-serif; font-weight: bold; font-size: .85em; }
+#gemasHud { color: #5cffe0; font-size: .75em; text-shadow: 2px 2px 0 #000; }
+
+/* ---------- HUD: escudo y munición ---------- */
+#btnEscudo { position: absolute; right: calc(3vw + 36vh); bottom: 40vh; width: 14vh; height: 14vh; font-size: 6vh;
+  background: conic-gradient(rgba(90,190,255,.9) var(--carga, 0%), rgba(40,25,50,.8) 0); }
+#btnEscudo.listo { box-shadow: 0 0 2.5vh #7fd8ff; }
+#municion { position: absolute; right: 3vw; bottom: 47vh; width: 34vh; text-align: center; color: #ffd83b;
+  font-size: 3.6vh; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+
+/* ---------- EDITAR NAVE (como el dibujo: fondo blanco, línea azul, columna morada) ---------- */
+#editor { background: transparent; }
+.volver { position: absolute; top: 2vh; left: 2vw; z-index: 2; padding: 1vh 2vw; border-radius: 10px;
+  background: #4e0a66; color: #fff; font-size: 4vh; }
+.volver.derecha { left: auto; right: 2vw; background: #9d33c4; }
+.titulo-pantalla { position: absolute; top: 2.5vh; left: 0; width: 55%; text-align: center; font-size: 6vh; color: #111; }
+.titulo-pantalla.claro { width: 100%; color: #fff; text-shadow: 3px 3px 0 #000; }
+.linea-azul { position: absolute; left: 53%; top: -5vh; bottom: -5vh; width: 14vw; border-left: 1.4vh solid #2f8fff;
+  border-radius: 50% 0 0 50%; pointer-events: none; }
+.panel-editor { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; background: #8e2bb8;
+  border-left: 1vh solid #111; display: flex; flex-direction: column; padding: 2vh 2vw; gap: 1.5vh; overflow-y: auto; }
+#ranuras { display: flex; flex-direction: column; gap: 1.5vh; flex: 1; }
+.ranura { flex: 1; border: .8vh solid #111; border-radius: 12px; background: #a44ad0; padding: 1vh 1.5vw;
+  display: flex; flex-direction: column; justify-content: center; }
+.ranura.pronto { opacity: .5; }
+.ranura-nombre { font-size: 4.2vh; color: #111; }
+.ranura-fila { display: flex; align-items: center; justify-content: space-between; gap: 1vw; color: #fff;
+  font-size: 3.6vh; text-shadow: 2px 2px 0 #000; text-align: center; }
+.ranura-fila .fl { font-size: 6vh; padding: 0 1.5vw; color: #111; text-shadow: none; cursor: pointer; }
+.ranura-fila .fl:active { color: #fff; }
+
+/* ---------- TIENDA ---------- */
+#tienda { background: #412a47; }
+#gemasTienda { color: #5cffe0; font-family: sans-serif; font-weight: bold; }
+#productos { position: absolute; top: 13vh; left: 3vw; right: 3vw; bottom: 9vh; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(30vw, 1fr)); gap: 2vh 2vw; align-content: start; }
+.producto { background: #9d33c4; border: .7vh solid #111; border-radius: 14px; padding: 1.5vh 1.5vw;
+  display: flex; flex-direction: column; gap: 1vh; }
+.producto.tiene { background: #5d7a3a; }
+.prod-nombre { font-size: 4.4vh; color: #fff; text-shadow: 2px 2px 0 #000; }
+.prod-desc { font-size: 3vh; color: #f6e6ff; font-family: sans-serif; }
+.prod-btn { align-self: flex-end; padding: 1vh 2vw; border-radius: 10px; background: #ffd83b; font-size: 4vh; }
+.prod-btn.falta { background: #b9a9c0; }
+.producto.tiene .prod-btn { background: transparent; color: #fff; }
+#avisoTienda { position: absolute; bottom: 2vh; left: 0; right: 0; text-align: center; color: #ffd83b; font-size: 3.6vh; text-shadow: 2px 2px 0 #000; }
+.ranura.pronto::after { display: none; }
