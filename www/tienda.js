@@ -10,6 +10,11 @@ export const PIEZAS = {
   tirador: [
     { id: 'triple', nombre: 'Tirador de fuego triple', desc: 'Dispara tres láseres a la vez', precio: 260 },
     { id: 'rapido', nombre: 'Tirador de fuego rápido', desc: 'Muy rápido, pero hay que recargar', precio: 100 },
+    { id: 'laser', nombre: 'Tirador de fuego láser', desc: 'Tira un láser muy largo que dura poco', precio: 480 },
+    { id: 'ametralladora', nombre: 'Ametralladora láser', desc: '20 disparos seguidos; se recarga sola mientras no la usas', precio: 701 },
+  ],
+  misiles: [
+    { id: 'triplesVerdes', nombre: 'Misiles triples verdes', desc: 'Tres misiles verdes que se esparcen', precio: 100 },
   ],
 };
 
@@ -17,14 +22,15 @@ export const RANURAS = [
   { id: 'elitras', nombre: 'ÉLITRAS' },
   { id: 'central', nombre: 'ZONA CENTRAL' },
   { id: 'tirador', nombre: 'TIRADOR DE FUEGO' },
-  { id: 'misiles', nombre: 'MISILES', pronto: true },
+  { id: 'misiles', nombre: 'MISILES' },
 ];
 
 export const GEMAS_POR_DERRIBO = 5;
 export const GEMAS_POR_CRISTAL = 2;
 
 const CLAVE = 'bis-tienda';
-export const tienda = { gemas: 0, compradas: [], equipo: { elitras: null, tirador: null, central: null } };
+// se empieza el juego con 5 gemas
+export const tienda = { gemas: 5, compradas: [], equipo: { elitras: null, tirador: null, central: null, misiles: null } };
 try {
   const g = JSON.parse(localStorage.getItem(CLAVE) || '{}');
   if (typeof g.gemas === 'number') tienda.gemas = g.gemas;

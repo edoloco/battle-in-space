@@ -407,7 +407,49 @@ export function crearEspeciales({ scene, naves, asteroides, danar, explosion, so
     };
   }
 
-  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo };
+  // ---------------- MISILES TRIPLES VERDES (pieza de la tienda) ----------------
+  function misilesVerdes(n, dir) {
+    const lista = [];
+    const arriba = new THREE.Vector3(0, 1, 0);
+    for (const ang of [-0.3, 0, 0.3]) {
+      const d = dir.clone().applyAxisAngle(arriba, ang).normalize();
+      const g = new THREE.Group();
+      const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 3.2, 8), new THREE.MeshStandardMaterial({ color: 0x3ccf4e, emissive: 0x0d4a14 }));
+      cuerpo.rotation.x = Math.PI / 2; g.add(cuerpo);
+      const punta = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.2, 8), new THREE.MeshBasicMaterial({ color: 0xb6ff5c }));
+      punta.rotation.x = Math.PI / 2; punta.position.z = 2.2; g.add(punta);
+      const fuego = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.6, 8), new THREE.MeshBasicMaterial({ color: 0xffd83b }));
+      fuego.rotation.x = -Math.PI / 2; fuego.position.z = -2.3; g.add(fuego);
+      g.position.copy(n.pos).addScaledVector(d, 4);
+      scene.add(g);
+      lista.push({ g, d, obj: mejorObjetivo(n, d, 0.5, 400), vivo: true });
+    }
+    sonido('turbo', cercaDelJugador(n.pos));
+    return {
+      t: 0, dur: 3,
+      update(dt) {
+        this.t += dt;
+        for (const m of lista) {
+          if (!m.vivo) continue;
+          if (this.t > 0.25 && m.obj && m.obj.vivo) { _a.subVectors(m.obj.pos, m.g.position).normalize(); m.d.lerp(_a, Math.min(1, dt * 2.5)).normalize(); }
+          m.g.position.addScaledVector(m.d, 140 * dt);
+          m.g.quaternion.setFromUnitVectors(_b.set(0, 0, 1), m.d);
+          if (Math.random() < 0.4) explosion(m.g.position.clone().addScaledVector(m.d, -2.5), false, 0x8cff7a);
+          const choca = rivalesDe(n).some(o => o.pos.distanceTo(m.g.position) < 6) || tocaAsteroide(m.g.position, 1);
+          if (choca || this.t >= this.dur) {
+            m.vivo = false; m.g.visible = false;
+            explosion(m.g.position.clone(), true, 0x5cff6e);
+            areaDano(m.g.position, 20, 30, n);
+            sonido('explosion', cercaDelJugador(m.g.position) * 0.6);
+          }
+        }
+        return lista.some(m => m.vivo);
+      },
+      fin() { for (const m of lista) quitar(m.g); },
+    };
+  }
+
+  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo, misilesVerdes };
 
   return {
     usar(n, tipo, dir) {

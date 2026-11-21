@@ -31,13 +31,14 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 | Sumperlake | Láser donde apunta |
 | Tentaclesilla Storm | Rayo enredante: atrapa, frena y daña de a poco a los que están cerca |
 
-En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, G escudo.
+En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, G escudo, M misiles.
 
 ## Gemas, tienda y editor de nave
 
 - Ganas **5 💎** por cada rival que derribas y **2 💎** por cada cristal que encuentras flotando en la partida.
-- **Tienda:** Élitras simples (100, más rápida) · Élitras protectoras (309, botón 🛡 de escudo por 4 s) · Élitras pesadas (500, más lenta pero recibe la mitad del daño) · Tirador de fuego triple (260, tres láseres) · Tirador de fuego rápido (100, muy rápido pero recarga cada 40 tiros).
-- **Editar nave:** élitras, zona central (la nave de cualquier piloto), tirador de fuego y misiles (pronto).
+- **Tienda:** Élitras simples (100, más rápida) · Élitras protectoras (309, botón 🛡 de escudo por 4 s) · Élitras pesadas (500, más lenta pero recibe la mitad del daño) · Tirador de fuego triple (260, tres láseres) · Tirador de fuego rápido (100, muy rápido pero recarga cada 40 tiros) · Tirador de fuego láser (480, láser muy largo que dura poco) · Ametralladora láser (701, 20 disparos y se recarga sola mientras no la usas) · Misiles triples verdes (100, botón 🚀: tres misiles que se esparcen).
+- Se empieza el juego con **5 💎**.
+- **Editar nave:** élitras, zona central (la nave de cualquier piloto), tirador de fuego y misiles.
 
 ## Cómo está hecho
 

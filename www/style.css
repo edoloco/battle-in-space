@@ -145,7 +145,7 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 #btnEscudo { position: absolute; right: calc(3vw + 36vh); bottom: 40vh; width: 14vh; height: 14vh; font-size: 6vh;
   background: conic-gradient(rgba(90,190,255,.9) var(--carga, 0%), rgba(40,25,50,.8) 0); }
 #btnEscudo.listo { box-shadow: 0 0 2.5vh #7fd8ff; }
-#municion { position: absolute; right: 3vw; bottom: 47vh; width: 34vh; text-align: center; color: #ffd83b;
+#municion { position: absolute; right: 3vw; bottom: 57vh; width: 34vh; text-align: center; color: #ffd83b;
   font-size: 3.6vh; text-shadow: 2px 2px 0 #000; pointer-events: none; }
 
 /* ---------- EDITAR NAVE (como el dibujo: fondo blanco, línea azul, columna morada) ---------- */
@@ -184,3 +184,7 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 .producto.tiene .prod-btn { background: transparent; color: #fff; }
 #avisoTienda { position: absolute; bottom: 2vh; left: 0; right: 0; text-align: center; color: #ffd83b; font-size: 3.6vh; text-shadow: 2px 2px 0 #000; }
 .ranura.pronto::after { display: none; }
+
+#btnMisil { position: absolute; right: calc(3vw + 54vh); bottom: 14vh; width: 14vh; height: 14vh; font-size: 6vh;
+  background: conic-gradient(rgba(92,255,110,.85) var(--carga, 0%), rgba(40,25,50,.8) 0); }
+#btnMisil.listo { box-shadow: 0 0 2.5vh #5cff6e; }
