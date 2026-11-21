@@ -66,8 +66,15 @@ function sonido(tipo, vol = 1) {
 // ESCENA 3D
 // ============================================================
 const canvas = $('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+let calidad = 1.5;
+try { const c = parseFloat(localStorage.getItem('bis-calidad')); if (c > 0) calidad = c; } catch (e) {}
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: calidad > 1, powerPreference: 'high-performance' });
+} catch (e) {
+  throw new Error('No se pudo iniciar el 3D (WebGL): ' + e.message);
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, calidad));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2a1d33);
 scene.fog = new THREE.FogExp2(0x2a1d33, 0.0016);
@@ -755,10 +762,26 @@ redimensionar();
 
 let ultimo = performance.now();
 let hudT = 0;
+// Calidad automática: si va lento, baja la resolución (y lo recuerda)
+let fpsT = 0, fpsN = 0;
+function revisarRendimiento(dtReal) {
+  fpsT += dtReal; fpsN++;
+  if (fpsT < 3) return;
+  const fps = fpsN / fpsT;
+  fpsT = 0; fpsN = 0;
+  if (fps < 40 && calidad > 0.75) {
+    calidad = calidad > 1 ? 1 : 0.75;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, calidad));
+    redimensionar();
+    try { localStorage.setItem('bis-calidad', String(calidad)); } catch (e) {}
+  }
+}
 function bucle(ahora) {
   requestAnimationFrame(bucle);
-  const dt = Math.min(0.05, (ahora - ultimo) / 1000);
+  const dtReal = (ahora - ultimo) / 1000;
+  const dt = Math.min(0.05, dtReal);
   ultimo = ahora;
+  if (estado === 'jugando' && !document.hidden) revisarRendimiento(dtReal);
 
   for (const a of asteroides) { a.mesh.rotation.x += a.giro.x * dt; a.mesh.rotation.y += a.giro.y * dt; }
 
@@ -797,6 +820,7 @@ function bucle(ahora) {
 }
 crearAsteroides();
 requestAnimationFrame(bucle);
+window.__juegoListo = true;
 
 // ============================================================
 // MENÚ Y BOTONES
@@ -842,4 +866,4 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Para pruebas
-window.__juego = { get estado() { return estado; }, naves, nuevaPartida, input };
+window.__juego = { get calidad() { return calidad; }, get estado() { return estado; }, naves, nuevaPartida, input };

@@ -76,6 +76,32 @@
 
 <div id="girar">Gira el teléfono ↻</div>
 
+<div id="diag" style="display:none;position:fixed;inset:0;z-index:999;background:#300;color:#fff;font:14px monospace;padding:12px;overflow:auto;white-space:pre-wrap"></div>
+<script>
+  // Diagnóstico: si algo falla, lo muestra en pantalla
+  (function () {
+    var lineas = [];
+    function info() {
+      var gl2 = false, gl1 = false;
+      try { gl2 = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {}
+      try { gl1 = !!document.createElement('canvas').getContext('webgl'); } catch (e) {}
+      return 'WebGL2: ' + gl2 + '  WebGL1: ' + gl1 + '\n' + navigator.userAgent;
+    }
+    function mostrar(msg) {
+      lineas.push(msg);
+      var d = document.getElementById('diag');
+      d.style.display = 'block';
+      d.textContent = 'ERROR (saca una captura y mándala):\n\n' + lineas.join('\n') + '\n\n' + info() + '\n\n(toca para cerrar)';
+      d.onclick = function () { d.style.display = 'none'; };
+    }
+    window.addEventListener('error', function (e) {
+      mostrar((e.message || 'Error al cargar ' + ((e.target && (e.target.src || e.target.href)) || '?')) +
+        (e.filename ? '\n  en ' + e.filename + ':' + e.lineno : ''));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) { mostrar('Promesa: ' + (e.reason && (e.reason.stack || e.reason))); });
+    setTimeout(function () { if (!window.__juegoListo) mostrar('El juego no terminó de cargar.'); }, 6000);
+  })();
+</script>
 <script type="module" src="game.js"></script>
 </body>
 </html>
