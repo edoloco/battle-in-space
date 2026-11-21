@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#412a47">
+<title>Battle in Space</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<canvas id="hud2d"></canvas>
+
+<!-- PANTALLA DE TÍTULO -->
+<section id="titulo" class="screen visible">
+  <img src="img/titulo.jpg" alt="battle in space">
+  <div class="tocar">TOCA PARA EMPEZAR</div>
+</section>
+
+<!-- MENÚ -->
+<section id="menu" class="screen">
+  <img class="personaje" src="img/personaje.png" alt="">
+  <div class="menu-col">
+    <h1 class="logo">battle in space</h1>
+    <button class="bar jugar" id="btnJugar"><span>JUGAR</span></button>
+    <div class="fila">
+      <div class="bar opt"><span><b class="flecha" data-opt="vidas" data-d="-1">&lt;</b> VIDAS <i id="vVidas">5</i> <b class="flecha" data-opt="vidas" data-d="1">&gt;</b></span></div>
+      <div class="bar opt"><span><b class="flecha" data-opt="rivales" data-d="-1">&lt;</b> RIVALES <i id="vRivales">10</i> <b class="flecha" data-opt="rivales" data-d="1">&gt;</b></span></div>
+    </div>
+    <div class="fila">
+      <div class="bar opt pronto"><span>EDITAR NAVE</span></div>
+      <div class="bar opt pronto"><span>TIENDA</span></div>
+    </div>
+    <div class="fila">
+      <div class="bar opt pronto"><span>JUGAR EN LÍNEA</span></div>
+      <div class="bar opt pronto"><span>CREAR MUNDO 3D</span></div>
+    </div>
+    <button class="bar salir" id="btnSalir"><span>SALIR DEL JUEGO</span></button>
+  </div>
+</section>
+
+<!-- HUD DE LA PARTIDA -->
+<section id="hud" class="screen">
+  <div class="vida"><div class="vida-fill" id="vidaFill"></div><span>VIDA</span></div>
+  <div class="info">
+    <div id="vivas">11/11<br><small>PERSONAS VIVAS</small></div>
+    <div id="derribos">DERRIBOS 0</div>
+    <div id="corazones"></div>
+  </div>
+  <button class="cerrar" id="btnCerrar">✕</button>
+  <div id="feed"></div>
+  <div id="mensaje"></div>
+
+  <div id="joyZona"><div id="joy"><div class="arrows">‹ ›</div><div id="knob"></div></div></div>
+
+  <div id="botones">
+    <button id="btnFuego" class="redondo grande">✦<i></i><i></i></button>
+    <div id="turboBar"><div id="turboFill"></div></div>
+    <div class="chicos">
+      <button id="btnTurbo" class="redondo">✚</button>
+      <button id="btnGiro" class="redondo">⟲</button>
+    </div>
+  </div>
+</section>
+
+<!-- FIN DE PARTIDA -->
+<section id="fin" class="screen">
+  <div class="fin-caja">
+    <h2 id="finTitulo">¡GANASTE!</h2>
+    <p id="finTexto"></p>
+    <button class="bar jugar" id="btnOtra"><span>OTRA VEZ</span></button>
+    <button class="bar salir" id="btnMenu"><span>MENÚ</span></button>
+  </div>
+</section>
+
+<div id="girar">Gira el teléfono ↻</div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>

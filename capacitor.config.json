@@ -1,0 +1,8 @@
+{
+  "appId": "com.edoloco.battleinspace",
+  "appName": "Battle in Space",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#2e2534"
+  }
+}

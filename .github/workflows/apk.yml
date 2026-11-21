@@ -1,0 +1,61 @@
+name: Compilar APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Copiar el juego al proyecto Android
+        run: npx cap sync android
+
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Renombrar APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk battle-in-space.apk
+
+      - name: Mover la etiqueta "ultima" a este commit
+        run: |
+          git tag -f ultima
+          git push -f origin ultima
+
+      - name: Publicar en Releases (última versión)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ultima
+          name: Battle in Space (última versión)
+          body: |
+            APK generado automáticamente desde el commit ${{ github.sha }}.
+            Descarga **battle-in-space.apk** en el teléfono e instálalo.
+          files: battle-in-space.apk
+          make_latest: true
+          prerelease: false
+

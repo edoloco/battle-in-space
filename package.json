@@ -1,0 +1,18 @@
+{
+  "name": "battle-in-space",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Juego de naves 3D para Android",
+  "scripts": {
+    "servir": "npx http-server www -p 8080"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.0.0"
+  }
+}
