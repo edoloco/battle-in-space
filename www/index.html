@@ -20,24 +20,22 @@
 
 <!-- MENÚ -->
 <section id="menu" class="screen">
-  <img class="personaje" src="img/personaje.png" alt="">
+  <div class="retrato-caja">
+    <img class="retrato" id="retrato" src="img/pilotos/victor.png" alt="">
+    <div class="retrato-info"><b id="pilotoNombre">Víctor</b><br><small>Especial: <span id="pilotoEspecial">Tornado</span></small></div>
+  </div>
   <div class="menu-col">
     <h1 class="logo">battle in space</h1>
     <button class="bar jugar" id="btnJugar"><span>JUGAR</span></button>
+    <div class="bar opt piloto"><span><b class="flecha" data-opt="piloto" data-d="-1">&lt;</b> PILOTO <b class="flecha" data-opt="piloto" data-d="1">&gt;</b></span></div>
     <div class="fila">
       <div class="bar opt"><span><b class="flecha" data-opt="vidas" data-d="-1">&lt;</b> VIDAS <i id="vVidas">5</i> <b class="flecha" data-opt="vidas" data-d="1">&gt;</b></span></div>
       <div class="bar opt"><span><b class="flecha" data-opt="rivales" data-d="-1">&lt;</b> RIVALES <i id="vRivales">10</i> <b class="flecha" data-opt="rivales" data-d="1">&gt;</b></span></div>
     </div>
-    <div class="fila">
-      <div class="bar opt pronto"><span>EDITAR NAVE</span></div>
-      <div class="bar opt pronto"><span>TIENDA</span></div>
-    </div>
-    <div class="fila">
-      <div class="bar opt pronto"><span>JUGAR EN LÍNEA</span></div>
-      <div class="bar opt pronto"><span>CREAR MUNDO 3D</span></div>
-    </div>
+    <button class="bar opt actualizar" id="btnActualizar"><span id="txtActualizar">BUSCAR ACTUALIZACIONES</span></button>
     <button class="bar salir" id="btnSalir"><span>SALIR DEL JUEGO</span></button>
   </div>
+  <div id="version"></div>
 </section>
 
 <!-- HUD DE LA PARTIDA -->
@@ -54,6 +52,7 @@
 
   <div id="joyZona"><div id="joy"><div class="arrows">‹ ›</div><div id="knob"></div></div></div>
 
+  <button id="btnEspecial" class="redondo especial">‹ϟ›</button>
   <div id="botones">
     <button id="btnFuego" class="redondo grande">✦<i></i><i></i></button>
     <div id="turboBar"><div id="turboFill"></div></div>

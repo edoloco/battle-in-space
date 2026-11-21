@@ -1,20 +1,18 @@
 // Battle in Space — juego de naves 3D
 // Idea y diseño: Víctor. Código: Three.js (sin bundler, se carga directo).
 import * as THREE from './lib/three.module.js';
+import { PILOTOS, USO_IA, crearEspeciales } from './especiales.js';
 
 // ============================================================
 // AJUSTES (se guardan en el teléfono)
 // ============================================================
-const ajustes = { vidas: 5, rivales: 10 };
+const ajustes = { vidas: 5, rivales: 10, piloto: 'victor' };
 try { Object.assign(ajustes, JSON.parse(localStorage.getItem('bis-ajustes') || '{}')); } catch (e) {}
 const LIMITES = { vidas: [1, 9], rivales: [1, 20] };
 function guardarAjustes() { try { localStorage.setItem('bis-ajustes', JSON.stringify(ajustes)); } catch (e) {} }
 
 const $ = (id) => document.getElementById(id);
-const NOMBRES = ['Wither Storm', 'Ms. Pussles', 'Cometa', 'Zorro Rojo', 'Nebulón', 'Galaxia', 'Rayo',
-  'Meteoro', 'Pulpo Espacial', 'Capitán Queso', 'Turbo', 'Asteroide', 'Plutón', 'Láser', 'Saturno',
-  'Ovni', 'Marciano', 'Nova', 'Quásar', 'Eclipse'];
-const COLORES = [0xff4b4b, 0xff9a2e, 0x4bd16b, 0x3fa8ff, 0xff5fd1, 0xffe14b, 0x9a6bff, 0x48e3d6];
+const pilotoPorId = (id) => PILOTOS.find(p => p.id === id) || PILOTOS[0];
 
 // ============================================================
 // SONIDOS (generados, sin archivos)
@@ -160,7 +158,7 @@ function crearAsteroides() {
 // ============================================================
 // MODELO DE LA NAVE (como el dibujo: ala triangular, cabina negra, fuego atrás)
 // ============================================================
-function crearModeloNave(color, esJugador) {
+function crearModeloNave(color, acento) {
   const g = new THREE.Group();
   const matCuerpo = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.6, metalness: 0.2 });
   const matOscuro = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: 0.3, metalness: 0.5 });
@@ -187,7 +185,12 @@ function crearModeloNave(color, esJugador) {
   aleta.moveTo(0, 0); aleta.lineTo(-1.8, 0); aleta.lineTo(-2.2, 1.6); aleta.closePath();
   const ag = new THREE.ExtrudeGeometry(aleta, { depth: 0.2, bevelEnabled: false });
   ag.rotateY(Math.PI / 2); ag.translate(-0.1, 0.4, -0.3);
-  g.add(new THREE.Mesh(ag, new THREE.MeshStandardMaterial({ color: esJugador ? 0xa259c0 : 0x333333, flatShading: true })));
+  g.add(new THREE.Mesh(ag, new THREE.MeshBasicMaterial({ color: acento })));
+  // franjas brillantes en las alas (para ver bien las naves oscuras)
+  for (const lado of [-1, 1]) {
+    const fr = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 0.35), new THREE.MeshBasicMaterial({ color: acento }));
+    fr.position.set(lado * 2.6, 0.38, -1.2); fr.rotation.y = lado * 0.5; g.add(fr);
+  }
 
   // Fuego del motor
   const fuego = new THREE.Group();
@@ -209,16 +212,20 @@ const naves = [];
 let jugador = null;
 
 class Nave {
-  constructor(nombre, color, esJugador) {
-    this.nombre = nombre; this.esJugador = esJugador; this.color = color;
-    this.modelo = crearModeloNave(color, esJugador);
+  constructor(piloto, esJugador, nombre) {
+    this.piloto = piloto; this.nombre = nombre || piloto.nombre; this.esJugador = esJugador;
+    this.color = esJugador ? 0xf2f2f2 : piloto.color;
+    this.modelo = crearModeloNave(this.color, piloto.acento);
     this.obj = new THREE.Group(); this.obj.add(this.modelo); scene.add(this.obj);
     this.obj.rotation.order = 'YXZ';
     this.pos = this.obj.position;
     this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.alabeo = 0; this.giro = 0; this.giroT = 0;
     this.velocidad = esJugador ? 42 : 34;
-    this.hpMax = esJugador ? 100 : 40; this.hp = this.hpMax;
+    this.hpMax = esJugador ? 100 : 60; this.hp = this.hpMax;
+    this.vidas = ajustes.vidas; this.tReaparecer = 0;
+    this.cdEspecial = esJugador ? 2 : 4 + Math.random() * 6;
+    this.lento = 0;
     this.vivo = true; this.cdDisparo = 0; this.invulnerable = 0;
     this.turbo = 1; this.usandoTurbo = false;
     this.derribos = 0;
@@ -256,7 +263,8 @@ class Nave {
     return cambioYaw / Math.max(dt, 1e-4); // velocidad de giro (para inclinar)
   }
   mover(dt, tasaGiro) {
-    const v = this.velocidad * (this.usandoTurbo ? 1.9 : 1);
+    let v = this.velocidad * (this.usandoTurbo ? 1.9 : 1);
+    if (this.lento > 0) { this.lento -= dt; v *= 0.5; }
     this.adelante(this.vel).multiplyScalar(v);
     this.pos.addScaledVector(this.vel, dt);
     // inclinación visual
@@ -354,10 +362,13 @@ function actualizarEfectos(dt) {
   }
 }
 
+// Poderes especiales de cada piloto (ver especiales.js)
+const especiales = crearEspeciales({ scene, naves, asteroides, danar, explosion, sonido, jugador: () => jugador });
+
 // ============================================================
 // CONTROLES TÁCTILES + TECLADO
 // ============================================================
-const input = { x: 0, y: 0, fuego: false, turbo: false };
+const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false };
 const teclas = {};
 {
   const zona = $('joyZona'), base = $('joy'), knob = $('knob');
@@ -383,10 +394,12 @@ const teclas = {};
   boton($('btnFuego'), () => input.fuego = true, () => input.fuego = false);
   boton($('btnTurbo'), () => input.turbo = true, () => input.turbo = false);
   boton($('btnGiro'), () => hacerGiro(), null);
+  boton($('btnEspecial'), () => input.especial = true, null);
 }
 window.addEventListener('keydown', (e) => {
   teclas[e.code] = true;
   if (e.code === 'KeyE' || e.code === 'KeyQ') hacerGiro();
+  if (e.code === 'KeyF' || e.code === 'KeyR') input.especial = true;
   if (e.code === 'Escape' && estado === 'jugando') irAlMenu();
 });
 window.addEventListener('keyup', (e) => { teclas[e.code] = false; });
@@ -403,7 +416,7 @@ function hacerGiro() {
 // ESTADO DEL JUEGO
 // ============================================================
 let estado = 'titulo';
-let vidasRestantes = 0, totalPersonas = 0, tReaparecer = 0, tFin = 0;
+let totalPersonas = 0, tFin = 0;
 let objetivoFijado = null;
 
 function mostrar(id) {
@@ -416,22 +429,29 @@ function nuevaPartida() {
   naves.length = 0;
   for (const b of balas) scene.remove(b.mesh);
   balas.length = 0;
+  especiales.limpiar();
   crearAsteroides();
 
-  jugador = new Nave('Tú', 0xf2f2f2, true);
+  const mio = pilotoPorId(ajustes.piloto);
+  jugador = new Nave(mio, true, `${mio.nombre} (tú)`);
   naves.push(jugador);
   jugador.colocarAlAzar();
-  const nombres = [...NOMBRES].sort(() => Math.random() - 0.5);
+  // los rivales son los otros pilotos (si hay más rivales que pilotos, se repiten con número)
+  const otros = PILOTOS.filter(p => p !== mio).sort(() => Math.random() - 0.5);
+  const lista = [...otros, mio];
+  const veces = {};
   for (let i = 0; i < ajustes.rivales; i++) {
-    const n = new Nave(nombres[i % nombres.length], COLORES[i % COLORES.length], false);
+    const pil = lista[i % lista.length];
+    veces[pil.id] = (veces[pil.id] || 0) + 1;
+    const nombre = veces[pil.id] > 1 || pil === mio ? `${pil.nombre} ${veces[pil.id] + (pil === mio ? 1 : 0)}` : pil.nombre;
+    const n = new Nave(pil, false, nombre);
     naves.push(n);
     n.colocarAlAzar();
     n.cdDisparo = 2 + Math.random() * 2;
   }
-  vidasRestantes = ajustes.vidas;
   totalPersonas = ajustes.rivales + 1;
   jugador.invulnerable = 3;
-  tReaparecer = 0; tFin = 0;
+  tFin = 0;
   $('feed').innerHTML = '';
   $('mensaje').textContent = '¡A LUCHAR!';
   setTimeout(() => { if ($('mensaje').textContent === '¡A LUCHAR!') $('mensaje').textContent = ''; }, 1500);
@@ -448,9 +468,7 @@ function irAlMenu() {
 }
 
 function personasVivas() {
-  let n = naves.filter(n => !n.esJugador && n.vivo).length;
-  if (vidasRestantes > 0) n += 1;
-  return n;
+  return naves.filter(n => n.vidas > 0).length;
 }
 
 function avisar(texto) {
@@ -462,10 +480,10 @@ function avisar(texto) {
   setTimeout(() => d.remove(), 3600);
 }
 
-function danar(nave, cant, atacante) {
+function danar(nave, cant, atacante, silencioso) {
   if (!nave.vivo || nave.invulnerable > 0) return;
   nave.hp -= cant;
-  if (nave.esJugador) sonido('golpe');
+  if (nave.esJugador && !silencioso) sonido('golpe');
   if (nave.hp <= 0) {
     nave.hp = 0; nave.vivo = false; nave.obj.visible = false;
     explosion(nave.pos.clone(), true);
@@ -473,12 +491,14 @@ function danar(nave, cant, atacante) {
     sonido('explosion', nave.esJugador ? 1 : Math.max(0.15, 1 - dist / 400));
     if (atacante) atacante.derribos++;
     const quien = atacante ? atacante.nombre : 'un asteroide';
+    nave.vidas--;
+    if (nave.vidas > 0) nave.tReaparecer = 2.5;
+    const resto = nave.vidas > 0 ? ` (le quedan ${nave.vidas} ♥)` : ' ¡ELIMINADO!';
     if (nave.esJugador) {
-      vidasRestantes--;
       avisar(`${quien} te derribó`);
-      if (vidasRestantes > 0) { tReaparecer = 2.5; $('mensaje').textContent = 'REAPARECIENDO...'; }
+      if (nave.vidas > 0) $('mensaje').textContent = 'REAPARECIENDO...';
     } else {
-      avisar(atacante && atacante.esJugador ? `¡Derribaste a ${nave.nombre}!` : `${quien} derribó a ${nave.nombre}`);
+      avisar((atacante && atacante.esJugador ? `¡Derribaste a ${nave.nombre}!` : `${quien} derribó a ${nave.nombre}`) + resto);
     }
     actualizarHUD();
   }
@@ -546,6 +566,13 @@ function actualizarIA(n, dt) {
       disparar(n, _v2.normalize());
       n.cdDisparo = 0.45 + Math.random() * 0.6;
     }
+    // poder especial
+    n.cdEspecial -= dt;
+    const uso = USO_IA[n.piloto.especial];
+    if (n.cdEspecial <= 0 && dist < uso.dist && ang < uso.ang) {
+      especiales.usar(n, n.piloto.especial, _v2.copy(dir).normalize());
+      n.cdEspecial = n.piloto.cd * (1.4 + Math.random());
+    }
   } else dir.copy(n.adelante());
   if (n.pos.length() > R * 0.85) dir.copy(n.pos).negate();
   evitarAsteroides(n, dir.normalize());
@@ -599,6 +626,18 @@ function actualizarJugador(dt) {
     if (d > 420) continue;
     const ang = f.angleTo(_v);
     if (ang < mejorAng) { mejorAng = ang; objetivoFijado = n; }
+  }
+
+  // poder especial
+  j.cdEspecial -= dt;
+  if (input.especial) {
+    input.especial = false;
+    if (j.cdEspecial <= 0) {
+      let dir = null;
+      if (objetivoFijado) dir = _v2.copy(objetivoFijado.pos).sub(j.pos).normalize();
+      especiales.usar(j, j.piloto.especial, dir);
+      j.cdEspecial = j.piloto.cd;
+    }
   }
 
   j.cdDisparo -= dt;
@@ -686,7 +725,12 @@ function actualizarHUD() {
     vivasAntes = vivas;
   }
   $('derribos').textContent = `DERRIBOS ${jugador.derribos}`;
-  $('corazones').textContent = '♥'.repeat(Math.max(0, vidasRestantes));
+  $('corazones').textContent = '♥'.repeat(Math.max(0, jugador.vidas));
+  const btnE = $('btnEspecial');
+  const listo = jugador.cdEspecial <= 0;
+  const pct = listo ? 100 : 100 - (jugador.cdEspecial / jugador.piloto.cd) * 100;
+  btnE.style.setProperty('--carga', pct + '%');
+  btnE.classList.toggle('listo', listo);
   $('turboFill').style.width = (jugador.turbo * 100) + '%';
 }
 
@@ -729,7 +773,7 @@ function dibujarHUD2D() {
       }
       if (dist < 250) {
         ctx.fillStyle = '#fff'; ctx.font = `${11 * s}px Marker, sans-serif`; ctx.textAlign = 'center';
-        ctx.fillText(n.nombre, x, by - 4 * s);
+        ctx.fillText(`${n.nombre} ${'♥'.repeat(Math.max(0, n.vidas))}`, x, by - 4 * s);
       }
     } else {
       // triángulo rojo en el borde apuntando al rival
@@ -787,24 +831,26 @@ function bucle(ahora) {
 
   if (estado === 'jugando') {
     if (jugador.vivo) actualizarJugador(dt);
-    else if (vidasRestantes > 0) {
-      tReaparecer -= dt;
-      if (tReaparecer <= 0) {
-        jugador.vivo = true; jugador.hp = jugador.hpMax; jugador.turbo = 1;
-        jugador.colocarAlAzar(); jugador.invulnerable = 3;
-        $('mensaje').textContent = '';
-        posicionarCamara(true);
+    // reaparecer (jugador y rivales tienen las mismas vidas)
+    for (const n of naves) {
+      if (n.vivo || n.vidas <= 0) continue;
+      n.tReaparecer -= dt;
+      if (n.tReaparecer <= 0) {
+        n.vivo = true; n.hp = n.hpMax; n.turbo = 1; n.lento = 0;
+        n.colocarAlAzar(); n.invulnerable = 3; n.obj.visible = true;
+        if (n.esJugador) { $('mensaje').textContent = ''; posicionarCamara(true); }
       }
     }
     for (const n of naves) if (!n.esJugador && n.vivo) actualizarIA(n, dt);
+    especiales.actualizar(dt);
     actualizarBalas(dt);
     choquesNaves();
     if (jugador.vivo) posicionarCamara(false, dt);
 
-    const rivalesVivos = naves.some(n => !n.esJugador && n.vivo);
-    if (!rivalesVivos || vidasRestantes <= 0) {
+    const rivalesVivos = naves.some(n => !n.esJugador && n.vidas > 0);
+    if (!rivalesVivos || jugador.vidas <= 0) {
       tFin += dt;
-      if (tFin > 1.8) terminar(!rivalesVivos && vidasRestantes > 0);
+      if (tFin > 1.8) terminar(!rivalesVivos && jugador.vidas > 0);
     }
     hudT -= dt;
     if (hudT <= 0) { actualizarHUD(); hudT = 0.1; }
@@ -825,14 +871,27 @@ window.__juegoListo = true;
 // ============================================================
 // MENÚ Y BOTONES
 // ============================================================
-function pintarAjustes() { $('vVidas').textContent = ajustes.vidas; $('vRivales').textContent = ajustes.rivales; }
+function pintarAjustes() {
+  $('vVidas').textContent = ajustes.vidas; $('vRivales').textContent = ajustes.rivales;
+  const p = pilotoPorId(ajustes.piloto);
+  $('retrato').src = `img/pilotos/${p.id}.png`;
+  $('pilotoNombre').textContent = p.nombre;
+  $('pilotoEspecial').textContent = p.nombreEspecial;
+}
 pintarAjustes();
 
 $('titulo').addEventListener('pointerdown', () => { iniciarAudio(); sonido('click'); irAlMenu(); });
 for (const f of document.querySelectorAll('.flecha')) {
   f.addEventListener('pointerdown', (e) => {
     e.stopPropagation(); iniciarAudio(); sonido('click');
-    const k = f.dataset.opt, [mn, mx] = LIMITES[k];
+    const k = f.dataset.opt;
+    if (k === 'piloto') {
+      const i = PILOTOS.indexOf(pilotoPorId(ajustes.piloto));
+      ajustes.piloto = PILOTOS[(i + Number(f.dataset.d) + PILOTOS.length) % PILOTOS.length].id;
+      pintarAjustes(); guardarAjustes();
+      return;
+    }
+    const [mn, mx] = LIMITES[k];
     ajustes[k] += Number(f.dataset.d);
     if (ajustes[k] > mx) ajustes[k] = mn;
     if (ajustes[k] < mn) ajustes[k] = mx;
@@ -867,3 +926,53 @@ document.addEventListener('visibilitychange', () => {
 
 // Para pruebas
 window.__juego = { get calidad() { return calidad; }, get estado() { return estado; }, naves, nuevaPartida, input };
+
+// ============================================================
+// BUSCAR ACTUALIZACIONES (consulta la última versión publicada en GitHub)
+// ============================================================
+const REPO = 'edoloco/battle-in-space';
+const URL_APK = `https://github.com/${REPO}/releases/download/ultima/battle-in-space.apk`;
+let versionActual = null, versionNueva = null;
+
+async function leerVersionActual() {
+  const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (!App || !App.getInfo) return null;
+  try { const info = await App.getInfo(); return parseInt(info.build, 10) || null; } catch (e) { return null; }
+}
+
+async function buscarActualizacion(manual) {
+  const txt = $('txtActualizar'), btn = $('btnActualizar');
+  if (versionNueva && manual) { descargarActualizacion(); return; }
+  if (manual) txt.textContent = 'BUSCANDO...';
+  try {
+    if (versionActual === null) versionActual = await leerVersionActual();
+    if (versionActual) $('version').textContent = 'v' + versionActual;
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/ultima`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('GitHub respondió ' + r.status);
+    const datos = await r.json();
+    const m = /v(\d+)/.exec(datos.name || '');
+    const ultima = m ? parseInt(m[1], 10) : 0;
+    if (versionActual === null) {
+      txt.textContent = manual ? 'VERSIÓN WEB: YA ES LA ÚLTIMA' : 'BUSCAR ACTUALIZACIONES';
+    } else if (ultima > versionActual) {
+      versionNueva = ultima;
+      txt.textContent = `¡NUEVA v${ultima}! TOCA PARA DESCARGAR`;
+      btn.classList.add('nueva');
+    } else if (manual) {
+      txt.textContent = `TIENES LA ÚLTIMA (v${versionActual})`;
+    }
+  } catch (e) {
+    if (manual) txt.textContent = 'SIN INTERNET, INTENTA DE NUEVO';
+  }
+  if (manual && !versionNueva) setTimeout(() => { if (!versionNueva) txt.textContent = 'BUSCAR ACTUALIZACIONES'; }, 4000);
+}
+
+function descargarActualizacion() {
+  const Browser = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser;
+  $('txtActualizar').textContent = 'DESCARGANDO... ABRE EL APK AL TERMINAR';
+  if (Browser) Browser.open({ url: URL_APK });
+  else window.open(URL_APK, '_blank');
+}
+
+$('btnActualizar').addEventListener('click', () => { iniciarAudio(); sonido('click'); buscarActualizacion(true); });
+buscarActualizacion(false); // revisa sola al abrir el juego

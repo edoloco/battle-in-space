@@ -14,10 +14,24 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 - **Botón grande ✦:** disparar (mantener apretado). Si hay un rival al frente, la mira se fija sola en él
 - **✚ Turbo:** más velocidad, gasta la barra amarilla
 - **⟲ Giro:** tonel (barrel roll), por un instante no te pueden dañar
+- **‹ϟ› Especial:** el poder de tu piloto (se recarga; brilla cuando está listo)
 - Gana el último que queda vivo. Las flechas rojas en el borde muestran dónde están los rivales.
-- En el menú se eligen las **VIDAS** (1–9) y los **RIVALES** (1–20).
+- En el menú se eligen el **PILOTO**, las **VIDAS** (1–9, iguales para todos) y los **RIVALES** (1–20).
+- **BUSCAR ACTUALIZACIONES** revisa si hay un APK nuevo en GitHub y lo descarga.
 
-En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro.
+## Pilotos
+
+| Piloto | Especial |
+|---|---|
+| Víctor | Tornado donde mira: chupa y daña a los que atrapa |
+| Ms. Pussles | Rayos donde apunta: saltan de un rival a otro |
+| Wap | Big Bomb: bomba con explosión gigante |
+| Big Bad | Montón de huesos donde apunta |
+| Hum-ater-ed Storm | Misil gigante de wither que persigue |
+| Sumperlake | Láser donde apunta |
+| Tentaclesilla Storm | Rayo enredante: atrapa, frena y daña de a poco a los que están cerca |
+
+En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial.
 
 ## Cómo está hecho
 
