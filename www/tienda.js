@@ -11,7 +11,7 @@ export const PIEZAS = {
     { id: 'triple', nombre: 'Tirador de fuego triple', desc: 'Dispara tres láseres a la vez', precio: 260 },
     { id: 'rapido', nombre: 'Tirador de fuego rápido', desc: 'Muy rápido, pero hay que recargar', precio: 100 },
     { id: 'laser', nombre: 'Tirador de fuego láser', desc: 'Tira un láser muy largo que dura poco', precio: 480 },
-    { id: 'ametralladora', nombre: 'Ametralladora láser', desc: '20 disparos seguidos; se recarga sola mientras no la usas', precio: 701 },
+    { id: 'ametralladora', nombre: 'Ametralladora láser', desc: 'Chain gun amarilla: 150 disparos seguidos; se recarga sola mientras no la usas', precio: 701 },
   ],
   misiles: [
     { id: 'triplesVerdes', nombre: 'Misiles triples verdes', desc: 'Tres misiles verdes que se esparcen', precio: 100 },

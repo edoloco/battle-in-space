@@ -228,7 +228,24 @@ function agregarPiezas(g, eq) {
       g.add(raya);
     }
   }
-  if (eq.tirador) {
+  if (eq.tirador === 'ametralladora') {
+    // chain gun amarilla: 6 cañones que giran, uno bajo cada ala
+    const matA = new THREE.MeshStandardMaterial({ color: 0xffd400, metalness: 0.5, roughness: 0.35, emissive: 0x3a2e00 });
+    const matN = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.6 });
+    g.userData.giratorios = [];
+    for (const lado of [-1, 1]) {
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.4, 10), matN);
+      base.rotation.x = Math.PI / 2; base.position.set(lado * 1.9, -0.2, 0.4); g.add(base);
+      const giro = new THREE.Group(); giro.position.set(lado * 1.9, -0.2, 2.6);
+      for (let i = 0; i < 6; i++) {
+        const a = i / 6 * Math.PI * 2;
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.6, 6), matA);
+        c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.45, Math.sin(a) * 0.45, 0); giro.add(c);
+      }
+      const aro = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 6, 12), matN); aro.position.z = 1.4; giro.add(aro);
+      g.add(giro); g.userData.giratorios.push(giro);
+    }
+  } else if (eq.tirador) {
     const matC = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, metalness: 0.6, roughness: 0.4 });
     const matP = new THREE.MeshBasicMaterial({ color: 0xffd83b });
     if (eq.tirador === 'laser') matC.color.set(0x7a3fa0);
@@ -292,7 +309,7 @@ class Nave {
     if (this.equipo.elitras === 'pesadas') { this.velocidad *= 0.8; this.defensa = 0.5; }
     this.municion = 40; this.recargando = 0;
     this.escudo = 0; this.cdEscudo = 0; this.cdMisil = 0;
-    if (this.equipo.tirador === 'ametralladora') this.municion = 20;
+    if (this.equipo.tirador === 'ametralladora') this.municion = 150;
     if (this.equipo.elitras === 'protectoras') {
       this.burbuja = new THREE.Mesh(new THREE.SphereGeometry(6.5, 16, 12),
         new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -367,6 +384,9 @@ const balas = [];
 const geoBala = new THREE.BoxGeometry(0.3, 0.3, 4);
 const matBalaJ = new THREE.MeshBasicMaterial({ color: 0xff7bff });
 const matBalaE = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+const geoBalaLarga = new THREE.BoxGeometry(0.7, 0.7, 11);
+const matBalaAmarilla = new THREE.MeshBasicMaterial({ color: 0xffe14b });
+let ladoCadena = 1;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 
 function disparar(nave, dirApuntada) {
@@ -376,17 +396,22 @@ function disparar(nave, dirApuntada) {
     dir.x += (Math.random() - 0.5) * 0.06; dir.y += (Math.random() - 0.5) * 0.06; dir.z += (Math.random() - 0.5) * 0.06;
     dir.normalize();
   }
-  const lados = !esJ ? [0] : nave.equipo.tirador === 'triple' ? [-2.6, 0, 2.6] : [-2.6, 2.6];
+  const cadena = esJ && nave.equipo.tirador === 'ametralladora';
+  if (cadena) { // chain gun: alterna entre los dos cañones, con un poquito de dispersión
+    ladoCadena = -ladoCadena;
+    dir.x += (Math.random() - 0.5) * 0.025; dir.y += (Math.random() - 0.5) * 0.025; dir.normalize();
+  }
+  const lados = !esJ ? [0] : cadena ? [ladoCadena * 1.9] : nave.equipo.tirador === 'triple' ? [-2.6, 0, 2.6] : [-2.6, 2.6];
   for (const lado of lados) {
-    const m = new THREE.Mesh(geoBala, esJ ? matBalaJ : matBalaE);
+    const m = new THREE.Mesh(cadena ? geoBalaLarga : geoBala, cadena ? matBalaAmarilla : esJ ? matBalaJ : matBalaE);
     nave.obj.updateMatrixWorld();
-    m.position.copy(nave.obj.localToWorld(_v.set(lado, 0.2, 2.5)));
+    m.position.copy(nave.obj.localToWorld(_v.set(lado, cadena ? -0.2 : 0.2, cadena ? 6 : 2.5)));
     _q.setFromUnitVectors(_v2.set(0, 0, 1), dir);
     m.quaternion.copy(_q);
     scene.add(m);
-    balas.push({ mesh: m, vel: dir.clone().multiplyScalar(280).add(nave.vel), vida: 1.6, dueno: nave, dano: esJ ? 10 : 7 });
+    balas.push({ mesh: m, vel: dir.clone().multiplyScalar(cadena ? 340 : 280).add(nave.vel), vida: 1.6, dueno: nave, dano: cadena ? 6 : esJ ? 10 : 7 });
   }
-  if (esJ) sonido('laser');
+  if (esJ) sonido('laser', cadena ? 0.35 : 1);
   else if (jugador && nave.pos.distanceTo(jugador.pos) < 200) sonido('laserEnemigo', 0.5);
 }
 
@@ -749,10 +774,13 @@ function actualizarJugador(dt) {
   const tir = j.equipo.tirador;
   // tirador rápido: hay que recargar
   if (j.recargando > 0) { j.recargando -= dt; if (j.recargando <= 0) j.municion = 40; }
-  // ametralladora láser: 20 disparos, se recarga sola mientras no la usas
+  // ametralladora láser: 150 disparos, se recarga sola mientras no la usas
   if (tir === 'ametralladora') {
     j.sinDisparar = fuego ? 0 : (j.sinDisparar || 0) + dt;
-    if (j.sinDisparar > 0.4) j.municion = Math.min(20, j.municion + dt * 12);
+    if (j.sinDisparar > 0.4) j.municion = Math.min(150, j.municion + dt * 40);
+    // los cañones giran más rápido mientras dispara
+    j.giroCanon = THREE.MathUtils.lerp(j.giroCanon || 0, fuego && j.municion >= 1 ? 30 : 0, Math.min(1, dt * 4));
+    for (const gc of j.modelo.userData.giratorios || []) gc.rotation.z += j.giroCanon * dt;
   }
 
   j.cdDisparo -= dt;
@@ -768,7 +796,7 @@ function actualizarJugador(dt) {
       j.cdDisparo = 0.45;
     } else {
       disparar(j, dir);
-      j.cdDisparo = tir === 'rapido' ? 0.06 : tir === 'ametralladora' ? 0.05 : 0.16;
+      j.cdDisparo = tir === 'rapido' ? 0.06 : tir === 'ametralladora' ? 0.045 : 0.16;
     }
     if (tir === 'rapido' && --j.municion <= 0) { j.recargando = 1.8; sonido('turbo'); }
     if (tir === 'ametralladora') j.municion -= 1;
@@ -893,7 +921,7 @@ function actualizarHUD() {
     b.classList.toggle('listo', listoE);
   }
   if (jugador.equipo.tirador === 'rapido') $('municion').textContent = jugador.recargando > 0 ? 'RECARGANDO' : `${jugador.municion}/40`;
-  if (jugador.equipo.tirador === 'ametralladora') $('municion').textContent = jugador.municion < 1 ? 'RECARGANDO...' : `${Math.floor(jugador.municion)}/20`;
+  if (jugador.equipo.tirador === 'ametralladora') $('municion').textContent = jugador.municion < 1 ? 'RECARGANDO...' : `${Math.floor(jugador.municion)}/150`;
   if (jugador.equipo.misiles) {
     const b = $('btnMisil'), listoM = jugador.cdMisil <= 0;
     b.style.setProperty('--carga', (listoM ? 100 : 100 - jugador.cdMisil / 6 * 100) + '%');
