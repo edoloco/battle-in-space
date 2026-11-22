@@ -23,13 +23,15 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 
 | Piloto | Especial |
 |---|---|
-| Víctor | Tornado donde mira: chupa y daña a los que atrapa |
+| Víctor | Tornado donde mira: persigue al rival más cercano a su camino, lo chupa y lo daña |
 | Ms. Pussles | Rayos donde apunta: 3 descargas, en abanico y saltando de rival en rival |
 | Wap | Big Bomb verde: explota y suelta más bombas verdes |
 | Big Bad | Montón de huesos donde apunta (3 oleadas) |
 | Hum-ater-ed Storm | Misil gigante de wither que persigue |
 | Sumperlake | Láser donde apunta |
 | Tentaclesilla Storm | Rayo enredante: atrapa, frena y daña de a poco a los que están cerca |
+| Kirby | Aspira a los rivales de adelante y después tira un misil estrella |
+| Ms. Loquín | Muchos misiles a lo loco |
 
 En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, G escudo, M misiles.
 

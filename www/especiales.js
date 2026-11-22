@@ -16,13 +16,17 @@ export const PILOTOS = [
     color: 0x252028, acento: 0xd7a3ff, cd: 9 },
   { id: 'tentaclesilla', nombre: 'Tentaclesilla Storm', especial: 'enredo', nombreEspecial: 'Rayo enredante',
     color: 0x3f8f80, acento: 0x9fffe8, cd: 11 },
+  { id: 'kirby', nombre: 'Kirby', especial: 'aspirar', nombreEspecial: 'Aspira y tira un misil estrella',
+    color: 0xe58ad0, acento: 0xff3b3b, cd: 10 },
+  { id: 'loquin', nombre: 'Ms. Loquín', especial: 'locura', nombreEspecial: 'Muchos misiles a lo loco',
+    color: 0x8ad98a, acento: 0xff9a00, cd: 11 },
 ];
 
 // Distancia/ángulo que usa la máquina para decidir cuándo lanzar cada especial
 export const USO_IA = {
   tornado: { dist: 220, ang: 0.3 }, rayos: { dist: 350, ang: 0.45 }, bomba: { dist: 200, ang: 0.2 },
   huesos: { dist: 170, ang: 0.2 }, misil: { dist: 420, ang: 0.8 }, laser: { dist: 320, ang: 0.15 },
-  enredo: { dist: 80, ang: Math.PI },
+  enredo: { dist: 80, ang: Math.PI }, aspirar: { dist: 200, ang: 0.4 }, locura: { dist: 250, ang: Math.PI },
 };
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
@@ -77,13 +81,21 @@ export function crearEspeciales({ scene, naves, asteroides, danar, explosion, so
     }
     g.position.copy(n.pos).addScaledVector(dir, 12);
     scene.add(g);
-    const vel = dir.clone().multiplyScalar(75);
+    const rumbo = dir.clone();
     sonido('turbo');
     return {
-      t: 0, dur: 3.8, g,
+      t: 0, dur: 4.2, g,
       update(dt) {
         this.t += dt;
-        g.position.addScaledVector(vel, dt);
+        // persigue al rival más cercano, solo si está cerca de su camino
+        let presa = null, mejorD = 160;
+        for (const o of rivalesDe(n)) {
+          _a.subVectors(o.pos, g.position);
+          const d = _a.length();
+          if (d < mejorD && rumbo.angleTo(_a) < 0.75) { mejorD = d; presa = o; }
+        }
+        if (presa) rumbo.lerp(_a.subVectors(presa.pos, g.position).normalize(), Math.min(1, dt * 2.2)).normalize();
+        g.position.addScaledVector(rumbo, 80 * dt);
         g.rotation.y += dt * 9;
         g.children.forEach((c, i) => { c.position.x = Math.sin(this.t * 6 + i) * 0.8; });
         const crece = Math.min(1, this.t * 3);
@@ -449,7 +461,141 @@ export function crearEspeciales({ scene, naves, asteroides, danar, explosion, so
     };
   }
 
-  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo, misilesVerdes };
+  // ---------------- MISIL PEQUEÑO (para Ms. Loquín) ----------------
+  function misilChico(n, pos, d, color) {
+    const g = new THREE.Group();
+    const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x555555 }));
+    cuerpo.rotation.x = Math.PI / 2; g.add(cuerpo);
+    const punta = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1, 6), new THREE.MeshBasicMaterial({ color }));
+    punta.rotation.x = Math.PI / 2; punta.position.z = 1.7; g.add(punta);
+    g.position.copy(pos); scene.add(g);
+    const vel = 110 + Math.random() * 50;
+    let presa = null, tBusca = 0.3 + Math.random() * 0.4;
+    return {
+      t: 0, dur: 2.6 + Math.random(),
+      update(dt) {
+        this.t += dt;
+        if (this.t > tBusca && !presa) presa = mejorObjetivo(n, d, 0.9, 300);
+        // vuela a lo loco: zigzag
+        d.add(_c.set(Math.sin(this.t * 13 + vel), Math.cos(this.t * 11 + vel), Math.sin(this.t * 9)).multiplyScalar(dt * 1.6));
+        if (presa && presa.vivo) d.lerp(_a.subVectors(presa.pos, g.position).normalize(), Math.min(1, dt * 1.8));
+        d.normalize();
+        g.position.addScaledVector(d, vel * dt);
+        g.quaternion.setFromUnitVectors(_b.set(0, 0, 1), d);
+        if (Math.random() < 0.35) explosion(g.position.clone().addScaledVector(d, -1.5), false, 0xffb347);
+        const choca = rivalesDe(n).some(o => o.pos.distanceTo(g.position) < 5) || tocaAsteroide(g.position, 1);
+        if (choca || this.t >= this.dur) {
+          explosion(g.position.clone(), true, color);
+          areaDano(g.position, 14, 16, n);
+          sonido('explosion', cercaDelJugador(g.position) * 0.35);
+          return false;
+        }
+        return true;
+      },
+      fin() { quitar(g); },
+    };
+  }
+
+  // ---------------- MUCHOS MISILES A LO LOCO (Ms. Loquín) ----------------
+  function locura(n, dir) {
+    let quedan = 18, tSig = 0;
+    const colores = [0xff9a00, 0x8ad98a, 0xff3b3b, 0xffe14b];
+    return {
+      t: 0,
+      update(dt) {
+        this.t += dt; tSig -= dt;
+        while (quedan > 0 && tSig <= 0 && n.vivo) {
+          tSig += 0.07; quedan--;
+          const d = n.adelante(new THREE.Vector3()).add(new THREE.Vector3().randomDirection().multiplyScalar(0.9)).normalize();
+          activos.push(misilChico(n, n.pos.clone().addScaledVector(d, 3), d, colores[quedan % colores.length]));
+          if (quedan % 3 === 0) sonido('laserEnemigo', cercaDelJugador(n.pos));
+        }
+        return quedan > 0 && n.vivo;
+      },
+      fin() {},
+    };
+  }
+
+  // ---------------- ASPIRAR + MISIL ESTRELLA (Kirby) ----------------
+  function estrella() {
+    const forma = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 1.6 : 4, a = i / 10 * Math.PI * 2 + Math.PI / 2;
+      i ? forma.lineTo(Math.cos(a) * r, Math.sin(a) * r) : forma.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    const geo = new THREE.ExtrudeGeometry(forma, { depth: 1.2, bevelEnabled: false });
+    geo.center();
+    return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffe14b }));
+  }
+  function aspirar(n, dir) {
+    const ALCANCE = 130;
+    // remolino de viento delante de la nave
+    const viento = new THREE.Group(); scene.add(viento);
+    const matV = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    for (let i = 0; i < 5; i++) {
+      const anillo = new THREE.Mesh(new THREE.TorusGeometry(4 + i * 4, 0.25, 4, 24), matV);
+      anillo.position.z = 8 + i * 18; viento.add(anillo);
+    }
+    let fase = 'aspira', estrellaM = null, d = null, presa = null;
+    sonido('turbo', cercaDelJugador(n.pos));
+    return {
+      t: 0,
+      update(dt) {
+        this.t += dt;
+        if (fase === 'aspira') {
+          if (!n.vivo) return false;
+          const f = n.adelante(new THREE.Vector3());
+          viento.position.copy(n.pos);
+          viento.quaternion.setFromUnitVectors(_b.set(0, 0, 1), f);
+          viento.children.forEach((a, i) => {
+            a.position.z = 8 + ((i * 18 + 90 - this.t * 120) % 90 + 90) % 90; // los anillos vienen hacia la nave
+            a.scale.setScalar(0.4 + a.position.z / 60);
+            a.rotation.z += dt * 4;
+          });
+          // chupa a los rivales que están adelante
+          for (const o of rivalesDe(n)) {
+            _a.subVectors(n.pos, o.pos);
+            const dist = _a.length();
+            if (dist < ALCANCE && f.angleTo(_a.clone().negate()) < 0.6) {
+              o.pos.addScaledVector(_a.normalize(), Math.min(dist - 8, 55 * dt));
+              o.lento = 0.3;
+              danar(o, 6 * dt, n, true);
+            }
+          }
+          if (this.t > 1.6) {
+            fase = 'estrella';
+            quitar(viento);
+            d = n.adelante(new THREE.Vector3());
+            presa = mejorObjetivo(n, d, 0.7, 450);
+            estrellaM = estrella(); estrellaM.position.copy(n.pos).addScaledVector(d, 6);
+            scene.add(estrellaM);
+            sonido('laser', cercaDelJugador(n.pos)); sonido('turbo', cercaDelJugador(n.pos));
+            this.tE = 0;
+          }
+          return true;
+        }
+        // misil estrella
+        this.tE += dt;
+        if (presa && presa.vivo) d.lerp(_a.subVectors(presa.pos, estrellaM.position).normalize(), Math.min(1, dt * 2.5)).normalize();
+        estrellaM.position.addScaledVector(d, 150 * dt);
+        estrellaM.quaternion.setFromUnitVectors(_b.set(0, 0, 1), d);
+        estrellaM.rotateZ(this.tE * 10);
+        if (Math.random() < 0.7) explosion(estrellaM.position.clone().addScaledVector(d, -3), false, 0xffe14b);
+        const choca = rivalesDe(n).some(o => o.pos.distanceTo(estrellaM.position) < 7) || tocaAsteroide(estrellaM.position, 2);
+        if (choca || this.tE > 3.5) {
+          const p = estrellaM.position.clone();
+          explosion(p, true, 0xffe14b); explosion(p, true, 0xff8fd0);
+          areaDano(p, 32, 65, n);
+          sonido('explosion', cercaDelJugador(p));
+          return false;
+        }
+        return true;
+      },
+      fin() { quitar(viento); if (estrellaM) quitar(estrellaM); },
+    };
+  }
+
+  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo, misilesVerdes, aspirar, locura };
 
   return {
     usar(n, tipo, dir) {
