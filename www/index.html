@@ -59,11 +59,35 @@
   <div class="titulo-mundo">JUGAR</div>
   <button class="cerrar-mundo" id="btnCerrarMundo">✕</button>
   <div class="mundos">
-    <div class="tarjeta-mundo pronto-m"><div class="mas">+</div><div class="tm-nombre">MUNDO PERSONALIZADO</div><div class="tm-sub">pronto: crear mundo 3D</div></div>
+    <button class="tarjeta-mundo" id="btnCrearMundo"><div class="mas">+</div><div class="tm-nombre">CREAR MUNDO 3D</div><div class="tm-sub">formas y colores</div></button>
+    <button class="tarjeta-mundo" id="btnMiMundo"><div class="mas mini">◆</div><div class="tm-nombre">MI MUNDO</div><div class="tm-sub" id="miMundoInfo">aún no lo creas</div></button>
     <button class="tarjeta-mundo" id="btnMundoAzar">
       <div class="estrellas"><i></i><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>
       <div class="tm-nombre">MUNDO AL AZAR</div><div class="tm-sub">cada partida es distinta</div>
     </button>
+  </div>
+</section>
+
+<!-- CREAR MUNDO 3D -->
+<section id="crearMundo" class="screen">
+  <div id="vistaMundo"></div>
+  <div class="titulo-crear">CREAR MUNDO 3D <small id="mundoCuenta"></small></div>
+  <div id="ayudaMundo"></div>
+  <div class="zoom"><button id="btnZoomMas">+</button><button id="btnZoomMenos">−</button></div>
+  <div class="panel-mundo">
+    <div class="tablas">
+      <div class="tabla-titulo">FORMAS 3D</div>
+      <div id="tablaFormas"></div>
+      <div class="tabla-titulo">COLORES</div>
+      <div id="tablaColores"></div>
+      <div class="ajuste-mundo"><b data-mundo="tam" data-d="-1">&lt;</b> TAMAÑO: <span id="vTamano"></span> <b data-mundo="tam" data-d="1">&gt;</b></div>
+      <div class="ajuste-mundo"><b data-mundo="alt" data-d="-1">&lt;</b> ALTURA: <span id="vAltura"></span> <b data-mundo="alt" data-d="1">&gt;</b></div>
+    </div>
+    <div class="opciones-mundo">
+      <button id="btnBorrarForma">BORRAR</button>
+      <button id="btnProbarMundo">PROBAR</button>
+      <button id="btnGuardarMundo">SALIR Y GUARDAR</button>
+    </div>
   </div>
 </section>
 
@@ -86,6 +110,8 @@
   <button id="btnEscudo" class="redondo especial">🛡</button>
   <button id="btnMisil" class="redondo especial">🚀</button>
   <button id="btnEspecial2" class="redondo especial">2</button>
+  <button id="btnTurbo10" class="redondo especial">⚡</button>
+  <button id="btnBotiquin" class="redondo especial">🩹</button>
   <div id="municion"></div>
   <div id="botones">
     <button id="btnFuego" class="redondo grande">✦<i></i><i></i></button>

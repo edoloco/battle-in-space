@@ -20,13 +20,15 @@ export const PILOTOS = [
     color: 0xe58ad0, acento: 0xff3b3b, cd: 10 },
   { id: 'loquin', nombre: 'Ms. Loquín', especial: 'locura', nombreEspecial: 'Muchos misiles a lo loco',
     color: 0x8ad98a, acento: 0xff9a00, cd: 11 },
+  { id: 'caine', nombre: 'Caine', especial: 'bug', nombreEspecial: 'Buguea la nave y tira un rayo bugeado',
+    color: 0xe53935, acento: 0xffffff, cd: 10 },
 ];
 
 // Distancia/ángulo que usa la máquina para decidir cuándo lanzar cada especial
 export const USO_IA = {
   tornado: { dist: 220, ang: 0.3 }, rayos: { dist: 350, ang: 0.45 }, bomba: { dist: 200, ang: 0.2 },
   huesos: { dist: 170, ang: 0.2 }, misil: { dist: 420, ang: 0.8 }, laser: { dist: 320, ang: 0.15 },
-  enredo: { dist: 80, ang: Math.PI }, aspirar: { dist: 200, ang: 0.4 }, locura: { dist: 250, ang: Math.PI },
+  enredo: { dist: 80, ang: Math.PI }, aspirar: { dist: 200, ang: 0.4 }, locura: { dist: 250, ang: Math.PI }, bug: { dist: 280, ang: 0.25 },
 };
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
@@ -596,7 +598,118 @@ export function crearEspeciales({ scene, naves, asteroides, danar, explosion, so
     };
   }
 
-  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo, misilesVerdes, aspirar, locura };
+  // ---------------- BUG (Caine): la nave se buguea y después tira un rayo muy bugeado ----------------
+  const COLORES_BUG = [0xff00ff, 0x00ffff, 0x00ff66, 0xffffff, 0xff2a2a, 0xffff00];
+  const geoPixel = new THREE.BoxGeometry(1, 1, 1);
+  function bug(n) {
+    const LARGO = 380;
+    const pixeles = new THREE.Group(); scene.add(pixeles);
+    const mats = COLORES_BUG.map(c => new THREE.MeshBasicMaterial({ color: c }));
+    for (let i = 0; i < 26; i++) { const p = new THREE.Mesh(geoPixel, mats[i % mats.length]); pixeles.add(p); }
+    const rayo = new THREE.Group(); rayo.visible = false; scene.add(rayo);
+    const SEG = 28;
+    for (let i = 0; i < SEG; i++) {
+      const m = new THREE.Mesh(geoPixel, mats[i % mats.length]);
+      rayo.add(m);
+    }
+    const fin = new THREE.Vector3(), ini = new THREE.Vector3();
+    sonido('golpe', cercaDelJugador(n.pos));
+    return {
+      t: 0,
+      update(dt) {
+        this.t += dt;
+        if (!n.vivo) return false;
+        const mod = n.modelo;
+        const f = n.adelante(new THREE.Vector3());
+        // 1) la nave se buguea: tiembla, cambia de tamaño y suelta pixeles
+        const bugea = this.t < 1.0 || Math.random() < 0.25;
+        mod.position.set((Math.random() - 0.5) * (bugea ? 1.6 : 0), (Math.random() - 0.5) * (bugea ? 1.2 : 0), 0);
+        mod.scale.set(bugea ? 0.7 + Math.random() * 0.7 : 1, bugea ? 0.6 + Math.random() * 0.9 : 1, 1);
+        mod.visible = !(bugea && Math.random() < 0.2);
+        pixeles.children.forEach(p => {
+          if (Math.random() < 0.3) {
+            p.position.copy(n.pos).add(_c.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 14));
+            p.scale.setScalar(0.4 + Math.random() * 1.6);
+            p.material = mats[Math.floor(Math.random() * mats.length)];
+          }
+        });
+        if (Math.random() < 0.15) sonido('click', cercaDelJugador(n.pos) * 0.6);
+        // 2) el rayo bugeado
+        if (this.t >= 1.0) {
+          if (!rayo.visible) { rayo.visible = true; sonido('laser', cercaDelJugador(n.pos)); sonido('turbo', cercaDelJugador(n.pos)); }
+          ini.copy(n.pos).addScaledVector(f, 4);
+          fin.copy(ini).addScaledVector(f, LARGO);
+          const lado = _a.set(0, 1, 0).cross(f).normalize(), arriba = _b.copy(f).cross(lado).normalize();
+          rayo.children.forEach((m, i) => {
+            const t = (i + Math.random() * 0.6) / SEG;
+            const salto = Math.random() < 0.3 ? 6 : 1.5;
+            m.position.copy(ini).lerp(fin, t).addScaledVector(lado, (Math.random() - 0.5) * salto).addScaledVector(arriba, (Math.random() - 0.5) * salto);
+            m.scale.set(1 + Math.random() * 4, 1 + Math.random() * 4, LARGO / SEG * (0.5 + Math.random()));
+            m.lookAt(fin);
+            m.material = mats[Math.floor(Math.random() * mats.length)];
+            m.visible = Math.random() > 0.12;
+          });
+          for (const o of rivalesDe(n)) if (distSegmento(o.pos, ini, fin) < 7) {
+            danar(o, 50 * dt, n, true);
+            if (Math.random() < 0.2) explosion(o.pos.clone(), false, COLORES_BUG[Math.floor(Math.random() * 6)]);
+          }
+        }
+        return this.t < 2.4;
+      },
+      fin() {
+        n.modelo.position.set(0, 0, 0); n.modelo.scale.set(1, 1, 1); n.modelo.visible = true;
+        scene.remove(pixeles); scene.remove(rayo); mats.forEach(m => m.dispose());
+      },
+    };
+  }
+
+  // ---------------- PROYECTILES ARCOÍRIS (pieza de la tienda) ----------------
+  const ARCOIRIS = [0xff3b3b, 0xff9a2e, 0xffe14b, 0x4bd16b, 0x3fa8ff, 0x9a6bff];
+  function brillantina(p) {
+    ARCOIRIS.forEach(c => explosion(p.clone(), false, c));
+    explosion(p.clone(), true, 0xffffff);
+    explosion(p.clone(), true, ARCOIRIS[Math.floor(Math.random() * ARCOIRIS.length)]);
+  }
+  function misilesArcoiris(n, dir) {
+    const lista = [];
+    for (let i = 0; i < 5; i++) {
+      const ang = (i - 2) * 0.16;
+      const d = dir.clone().applyAxisAngle(_c.set(0, 1, 0), ang).normalize();
+      const g = new THREE.Group();
+      const cuerpo = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), new THREE.MeshBasicMaterial({ color: ARCOIRIS[i] }));
+      cuerpo.scale.z = 2; g.add(cuerpo);
+      const estela = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.5, 8), new THREE.MeshBasicMaterial({ color: ARCOIRIS[(i + 3) % 6], transparent: true, opacity: 0.7 }));
+      estela.rotation.x = -Math.PI / 2; estela.position.z = -3; g.add(estela);
+      g.position.copy(n.pos).addScaledVector(d, 4);
+      scene.add(g);
+      lista.push({ g, d, obj: mejorObjetivo(n, d, 0.6, 400), vivo: true, color: ARCOIRIS[i] });
+    }
+    sonido('turbo', cercaDelJugador(n.pos));
+    return {
+      t: 0,
+      update(dt) {
+        this.t += dt;
+        for (const m of lista) {
+          if (!m.vivo) continue;
+          if (this.t > 0.2 && m.obj && m.obj.vivo) m.d.lerp(_a.subVectors(m.obj.pos, m.g.position).normalize(), Math.min(1, dt * 2.6)).normalize();
+          m.g.position.addScaledVector(m.d, 150 * dt);
+          m.g.quaternion.setFromUnitVectors(_b.set(0, 0, 1), m.d);
+          if (Math.random() < 0.5) explosion(m.g.position.clone().addScaledVector(m.d, -2), false, ARCOIRIS[Math.floor(Math.random() * 6)]);
+          const golpe = rivalesDe(n).some(o => o.pos.distanceTo(m.g.position) < 6);
+          if (golpe || tocaAsteroide(m.g.position, 1) || this.t > 3) {
+            m.vivo = false; m.g.visible = false;
+            if (golpe) brillantina(m.g.position); else explosion(m.g.position.clone(), false, m.color);
+            areaDano(m.g.position, 22, 35, n);
+            sonido('explosion', cercaDelJugador(m.g.position) * 0.5);
+          }
+        }
+        return lista.some(m => m.vivo);
+      },
+      fin() { for (const m of lista) quitar(m.g); },
+    };
+  }
+
+  const TIPOS = { tornado, rayos, bomba, huesos, misil, laser, enredo, misilesVerdes, aspirar, locura, bug, misilesArcoiris };
 
   return {
     usar(n, tipo, dir) {

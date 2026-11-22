@@ -2,7 +2,8 @@
 // Idea y diseño: Víctor. Código: Three.js (sin bundler, se carga directo).
 import * as THREE from './lib/three.module.js';
 import { PILOTOS, USO_IA, crearEspeciales } from './especiales.js';
-import { PIEZAS, RANURAS, tienda, guardarTienda, sumarGemas, comprar, GEMAS_POR_DERRIBO, GEMAS_POR_CRISTAL } from './tienda.js';
+import { crearEditorMundo, cargarMundo, mallaForma, choquesForma } from './mundo3d.js';
+import { PIEZAS, RANURAS, CONSUMIBLES, tienda, guardarTienda, sumarGemas, comprar, comprarConsumible, GEMAS_POR_DERRIBO, GEMAS_POR_CRISTAL } from './tienda.js';
 
 // ============================================================
 // AJUSTES (se guardan en el teléfono)
@@ -168,6 +169,20 @@ const MUNDOS = [
   { nombre: 'Vacío Tranquilo', fondo: 0x0d0d16, ast: 0x77778a, hue: 0.7, borde: 0x9a9aff, asteroides: 15 },
 ];
 let mundoActual = MUNDOS[0];
+// Mundo hecho por el jugador: sus formas son los obstáculos
+function aplicarMundoPropio(formas) {
+  aplicarMundo({ nombre: 'Mi mundo', fondo: 0x2a1d33, ast: 0x8c7a96, hue: 0.78, borde: 0xc070ff, asteroides: 0 });
+  const quieto = new THREE.Vector3();
+  for (const f of formas) {
+    const m = mallaForma(f);
+    scene.add(m);
+    asteroides.push({ mesh: m, r: 0, giro: quieto });
+    for (const c of choquesForma(f)) {
+      const o = new THREE.Object3D(); o.position.copy(c.pos);
+      asteroides.push({ mesh: o, r: c.r, giro: quieto });
+    }
+  }
+}
 function aplicarMundo(m) {
   mundoActual = m;
   scene.background.setHex(m.fondo);
@@ -232,7 +247,7 @@ function crearModeloNave(color, acento, equipo) {
 // Piezas compradas en la tienda (se ven en la nave)
 function agregarPiezas(g, eq) {
   if (eq.elitras) {
-    const colores = { simples: 0xffffff, protectoras: 0xffd83b, pesadas: 0x5a5560 };
+    const colores = { simples: 0xffffff, protectoras: 0xffd83b, pesadas: 0x5a5560, avanzadas: 0x2fd0ff, protectoras2: 0xff9a00 };
     const col = colores[eq.elitras];
     const grosor = eq.elitras === 'pesadas' ? 0.6 : 0.18;
     for (const lado of [-1, 1]) {
@@ -283,8 +298,9 @@ function agregarPiezas(g, eq) {
 }
 
 function agregarMisiles(g, eq) {
-  if (eq.misiles !== 'triplesVerdes') return;
-  const mat = new THREE.MeshStandardMaterial({ color: 0x3ccf4e, emissive: 0x0d4a14 });
+  if (!eq.misiles) return;
+  const arco = eq.misiles === 'arcoiris';
+  const mat = new THREE.MeshStandardMaterial({ color: arco ? 0xff5fd1 : 0x3ccf4e, emissive: arco ? 0x4a0d3a : 0x0d4a14 });
   const matGris = new THREE.MeshStandardMaterial({ color: 0x555555, flatShading: true });
   for (const lado of [-1, 1]) {
     const caja = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 2.4), matGris);
@@ -332,9 +348,11 @@ class Nave {
     this.municion = 40; this.recargando = 0;
     this.escudo = 0; this.cdEscudo = 0; this.cdMisil = 0;
     if (this.equipo.tirador === 'ametralladora') this.municion = 150;
-    if (this.equipo.elitras === 'protectoras') {
+    this.cdTurbo10 = 0; this.turbo10 = 0;
+    if (this.equipo.elitras === 'protectoras' || this.equipo.elitras === 'protectoras2') {
+      this.duracionEscudo = this.equipo.elitras === 'protectoras2' ? 8 : 4;
       this.burbuja = new THREE.Mesh(new THREE.SphereGeometry(6.5, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
+        new THREE.MeshBasicMaterial({ color: this.equipo.elitras === 'protectoras2' ? 0xffc04d : 0x7fd8ff, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
       this.burbuja.visible = false; this.obj.add(this.burbuja);
     }
     this.vivo = true; this.cdDisparo = 0; this.invulnerable = 0;
@@ -487,7 +505,7 @@ const especiales = crearEspeciales({ scene, naves, asteroides, danar, explosion,
 // ============================================================
 // CONTROLES TÁCTILES + TECLADO
 // ============================================================
-const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false, especial2: false, escudo: false, misil: false };
+const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false, especial2: false, escudo: false, misil: false, turbo10: false, botiquin: false };
 const teclas = {};
 {
   const zona = $('joyZona'), base = $('joy'), knob = $('knob');
@@ -517,6 +535,8 @@ const teclas = {};
   boton($('btnEscudo'), () => input.escudo = true, null);
   boton($('btnMisil'), () => input.misil = true, null);
   boton($('btnEspecial2'), () => input.especial2 = true, null);
+  boton($('btnTurbo10'), () => input.turbo10 = true, null);
+  boton($('btnBotiquin'), () => input.botiquin = true, null);
 }
 window.addEventListener('keydown', (e) => {
   teclas[e.code] = true;
@@ -525,6 +545,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyG') input.escudo = true;
   if (e.code === 'KeyM') input.misil = true;
   if (e.code === 'KeyV') input.especial2 = true;
+  if (e.code === 'KeyB') input.turbo10 = true;
+  if (e.code === 'KeyH') input.botiquin = true;
   if (e.code === 'Escape' && estado === 'jugando') irAlMenu();
 });
 window.addEventListener('keyup', (e) => { teclas[e.code] = false; });
@@ -548,14 +570,17 @@ function mostrar(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('visible', s.id === id);
 }
 
-function nuevaPartida() {
+let formasPartida = null, volverAlCreador = false;
+function nuevaPartida(formas = null) {
+  formasPartida = formas;
   // limpiar
   for (const n of naves) scene.remove(n.obj);
   naves.length = 0;
   for (const b of balas) scene.remove(b.mesh);
   balas.length = 0;
   especiales.limpiar();
-  aplicarMundo(MUNDOS[Math.floor(Math.random() * MUNDOS.length)]);
+  if (formas) aplicarMundoPropio(formas);
+  else aplicarMundo(MUNDOS[Math.floor(Math.random() * MUNDOS.length)]);
 
   const mio = pilotoPorId(ajustes.piloto);
   jugador = new Nave(mio, true, ajustes.nombre ? ajustes.nombre : `${mio.nombre} (tú)`);
@@ -584,6 +609,8 @@ function nuevaPartida() {
   $('btnEscudo').style.display = jugador.burbuja ? '' : 'none';
   $('municion').style.display = ['rapido', 'ametralladora'].includes(jugador.equipo.tirador) ? '' : 'none';
   $('btnMisil').style.display = jugador.equipo.misiles ? '' : 'none';
+  $('btnMisil').textContent = jugador.equipo.misiles === 'arcoiris' ? '🌈' : '🚀';
+  $('btnTurbo10').style.display = jugador.equipo.elitras === 'avanzadas' ? '' : 'none';
   $('feed').innerHTML = '';
   $('mensaje').innerHTML = `¡A LUCHAR!<br><small>${mundoActual.nombre}${ajustes.equipos ? ' · EQUIPOS' : ''}</small>`;
   setTimeout(() => { if ($('mensaje').textContent.startsWith('¡A LUCHAR!')) $('mensaje').textContent = ''; }, 2200);
@@ -598,6 +625,7 @@ function nuevaPartida() {
 }
 
 function irAlMenu() {
+  if (volverAlCreador) { volverAlCreador = false; abrirCreador(formasPartida); return; }
   estado = 'menu';
   $('gemasMenu').textContent = `💎 ${tienda.gemas}`;
   input.fuego = input.turbo = false;
@@ -615,6 +643,14 @@ function avisar(texto) {
   feed.appendChild(d);
   while (feed.children.length > 3) feed.removeChild(feed.firstChild);
   setTimeout(() => d.remove(), 3600);
+}
+
+function curar(nave, cant) {
+  nave.hp = Math.min(nave.hpMax, nave.hp + cant);
+  explosion(nave.pos.clone(), false, 0x7dff9a);
+  sonido('turbo', 0.6);
+  if (nave.esJugador) avisar(`+${cant} de energía`);
+  actualizarHUD();
 }
 
 function danar(nave, cant, atacante, silencioso) {
@@ -805,7 +841,29 @@ function actualizarJugador(dt) {
   if (j.escudo > 0) { j.escudo -= dt; if (j.escudo <= 0) j.burbuja.visible = false; else j.burbuja.material.opacity = 0.2 + Math.sin(performance.now() / 80) * 0.08; }
   if (input.escudo) {
     input.escudo = false;
-    if (j.burbuja && j.cdEscudo <= 0) { j.escudo = 4; j.cdEscudo = 15; j.burbuja.visible = true; sonido('turbo'); }
+    if (j.burbuja && j.cdEscudo <= 0) { j.escudo = j.duracionEscudo; j.cdEscudo = 15; j.burbuja.visible = true; sonido('turbo'); }
+  }
+
+  // élitras avanzadas: más rápido por 10 segundos
+  j.cdTurbo10 -= dt;
+  if (j.turbo10 > 0) { j.turbo10 -= dt; if (j.turbo10 <= 0) j.velocidad = j.velocidadBase; }
+  if (input.turbo10) {
+    input.turbo10 = false;
+    if (j.equipo.elitras === 'avanzadas' && j.cdTurbo10 <= 0) {
+      j.velocidadBase = j.velocidadBase || j.velocidad;
+      j.velocidad = j.velocidadBase * 1.7; j.turbo10 = 10; j.cdTurbo10 = 30;
+      sonido('turbo'); avisar('⚡ ¡MÁS RÁPIDO POR 10 SEGUNDOS!');
+    }
+  }
+
+  // botiquín: recupera parte de la energía
+  j.cdBotiquin = (j.cdBotiquin || 0) - dt;
+  if (input.botiquin) {
+    input.botiquin = false;
+    if (tienda.botiquines > 0 && j.cdBotiquin <= 0 && j.hp < j.hpMax) {
+      tienda.botiquines--; guardarTienda();
+      curar(j, 40); j.cdBotiquin = 2;
+    }
   }
 
   // misiles triples verdes
@@ -814,8 +872,8 @@ function actualizarJugador(dt) {
     input.misil = false;
     if (j.equipo.misiles && j.cdMisil <= 0) {
       const dir = objetivoFijado ? _v2.copy(objetivoFijado.pos).sub(j.pos).normalize() : null;
-      especiales.usar(j, 'misilesVerdes', dir);
-      j.cdMisil = 6;
+      especiales.usar(j, j.equipo.misiles === 'arcoiris' ? 'misilesArcoiris' : 'misilesVerdes', dir);
+      j.cdMisil = j.equipo.misiles === 'arcoiris' ? 7 : 6;
     }
   }
 
@@ -979,9 +1037,16 @@ function actualizarHUD() {
   }
   if (jugador.equipo.tirador === 'rapido') $('municion').textContent = jugador.recargando > 0 ? 'RECARGANDO' : `${jugador.municion}/40`;
   if (jugador.equipo.tirador === 'ametralladora') $('municion').textContent = jugador.municion < 1 ? 'RECARGANDO...' : `${Math.floor(jugador.municion)}/150`;
+  if (jugador.equipo.elitras === 'avanzadas') {
+    const b = $('btnTurbo10'), listoT = jugador.cdTurbo10 <= 0;
+    b.style.setProperty('--carga', (listoT ? 100 : 100 - jugador.cdTurbo10 / 30 * 100) + '%');
+    b.classList.toggle('listo', listoT);
+  }
+  $('btnBotiquin').style.display = tienda.botiquines > 0 ? '' : 'none';
+  $('btnBotiquin').dataset.n = tienda.botiquines;
   if (jugador.equipo.misiles) {
     const b = $('btnMisil'), listoM = jugador.cdMisil <= 0;
-    b.style.setProperty('--carga', (listoM ? 100 : 100 - jugador.cdMisil / 6 * 100) + '%');
+    b.style.setProperty('--carga', (listoM ? 100 : 100 - jugador.cdMisil / (jugador.equipo.misiles === 'arcoiris' ? 7 : 6) * 100) + '%');
     b.classList.toggle('listo', listoM);
   }
 }
@@ -993,40 +1058,75 @@ const cristales = [];
 const geoCristal = new THREE.OctahedronGeometry(1.8, 0);
 const matCristal = new THREE.MeshBasicMaterial({ color: 0x5cffe0 });
 const matCristalBorde = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
-let tNuevoCristal = 0;
-function nuevoCristal() {
+let tNuevoCristal = 0, tNuevaGasolina = 0, tNuevaVida = 0;
+
+function modeloItem(tipo) {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(geoCristal, matCristal));
-  const b = new THREE.Mesh(geoCristal, matCristalBorde); b.scale.setScalar(1.08); g.add(b);
-  g.scale.set(1, 1.6, 1);
-  let p;
-  do { p = new THREE.Vector3().randomDirection().multiplyScalar(60 + Math.random() * (R - 120)); }
-  while (asteroides.some(a => a.mesh.position.distanceTo(p) < a.r + 6));
+  if (tipo === 'gema') {
+    g.add(new THREE.Mesh(geoCristal, matCristal));
+    const b = new THREE.Mesh(geoCristal, matCristalBorde); b.scale.setScalar(1.08); g.add(b);
+    g.scale.set(1, 1.6, 1);
+  } else if (tipo === 'gasolina') { // bidón rojo con tapa amarilla
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(3, 4, 1.8), new THREE.MeshStandardMaterial({ color: 0xe53935, roughness: 0.4, emissive: 0x330000 })));
+    const tapa = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.8, 8), new THREE.MeshBasicMaterial({ color: 0xffd83b }));
+    tapa.position.set(0.8, 2.3, 0); g.add(tapa);
+    const asa = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.2, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    asa.position.set(-0.6, 2, 0); g.add(asa);
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.15, 6, 24), new THREE.MeshBasicMaterial({ color: 0xffd83b, transparent: true, opacity: 0.6 }));
+    g.add(aro); g.userData.aro = aro;
+  } else { // vida: corazón rosado
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff5a8a });
+    for (const x of [-0.9, 0.9]) { const e = new THREE.Mesh(new THREE.SphereGeometry(1.3, 12, 10), mat); e.position.set(x, 0.6, 0); g.add(e); }
+    const punta = new THREE.Mesh(new THREE.ConeGeometry(1.95, 2.6, 16), mat); punta.rotation.z = Math.PI; punta.position.y = -0.9; g.add(punta);
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.15, 6, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+    g.add(aro); g.userData.aro = aro;
+  }
+  return g;
+}
+function nuevoCristal(tipo = 'gema') {
+  const g = modeloItem(tipo);
+  let p, intentos = 0;
+  do { p = new THREE.Vector3().randomDirection().multiplyScalar(60 + Math.random() * (R - 120)); intentos++; }
+  while (intentos < 40 && asteroides.some(a => a.mesh.position.distanceTo(p) < a.r + 8));
   g.position.copy(p);
   scene.add(g);
-  cristales.push({ g, base: p.y, fase: Math.random() * 6 });
+  cristales.push({ g, base: p.y, fase: Math.random() * 6, tipo });
 }
 function crearCristales() {
   for (const c of cristales) scene.remove(c.g);
   cristales.length = 0;
-  for (let i = 0; i < 10; i++) nuevoCristal();
-  tNuevoCristal = 8;
+  for (let i = 0; i < 10; i++) nuevoCristal('gema');
+  for (let i = 0; i < 3; i++) nuevoCristal('gasolina');
+  nuevoCristal('vida');
+  tNuevoCristal = 8; tNuevaGasolina = 15; tNuevaVida = 30;
 }
 function actualizarCristales(dt) {
   const t = performance.now() / 1000;
   for (let i = cristales.length - 1; i >= 0; i--) {
     const c = cristales[i];
     c.g.rotation.y += dt * 2;
+    if (c.g.userData.aro) c.g.userData.aro.rotation.x += dt * 3;
     c.g.position.y = c.base + Math.sin(t * 2 + c.fase) * 1.5;
     if (jugador.vivo && jugador.pos.distanceTo(c.g.position) < 9) {
+      if (c.tipo === 'gasolina' && jugador.hp >= jugador.hpMax) continue; // no la gasta si estás lleno
       scene.remove(c.g); cristales.splice(i, 1);
-      sumarGemas(GEMAS_POR_CRISTAL); gemasPartida += GEMAS_POR_CRISTAL;
-      explosion(c.g.position.clone(), false, 0x5cffe0);
-      sonido('click'); avisar(`+${GEMAS_POR_CRISTAL} 💎`);
+      if (c.tipo === 'gema') {
+        sumarGemas(GEMAS_POR_CRISTAL); gemasPartida += GEMAS_POR_CRISTAL;
+        explosion(c.g.position.clone(), false, 0x5cffe0);
+        sonido('click'); avisar(`+${GEMAS_POR_CRISTAL} 💎`);
+      } else if (c.tipo === 'gasolina') {
+        curar(jugador, 35); avisar('⛽ ¡Gasolina!');
+      } else {
+        jugador.vidas++; explosion(c.g.position.clone(), true, 0xff5a8a);
+        sonido('turbo'); avisar('♥ ¡Una vida más!'); actualizarHUD();
+      }
     }
   }
-  tNuevoCristal -= dt;
-  if (tNuevoCristal <= 0) { tNuevoCristal = 8; if (cristales.length < 10) nuevoCristal(); }
+  const cuenta = (tipo) => cristales.filter(c => c.tipo === tipo).length;
+  tNuevoCristal -= dt; tNuevaGasolina -= dt; tNuevaVida -= dt;
+  if (tNuevoCristal <= 0) { tNuevoCristal = 8; if (cuenta('gema') < 10) nuevoCristal('gema'); }
+  if (tNuevaGasolina <= 0) { tNuevaGasolina = 15; if (cuenta('gasolina') < 3) nuevoCristal('gasolina'); }
+  if (tNuevaVida <= 0) { tNuevaVida = 30; if (cuenta('vida') < 1) nuevoCristal('vida'); }
 }
 
 const hud2d = $('hud2d'), ctx = hud2d.getContext('2d');
@@ -1173,7 +1273,8 @@ function bucle(ahora) {
   if (estado === 'editor') {
     if (modeloPreview) modeloPreview.rotation.y += dt * 0.6;
     renderer.render(escenaPreview, camPreview);
-  } else renderer.render(scene, camera);
+  } else if (estado === 'crearMundo') editorMundo.render();
+  else renderer.render(scene, camera);
   dibujarHUD2D();
 }
 crearAsteroides();
@@ -1227,8 +1328,25 @@ for (const f of document.querySelectorAll('.flecha')) {
     pintarAjustes(); guardarAjustes();
   });
 }
-$('btnJugar').addEventListener('click', () => { iniciarAudio(); sonido('click'); estado = 'elegirMundo'; mostrar('elegirMundo'); });
+$('btnJugar').addEventListener('click', () => { iniciarAudio(); sonido('click'); estado = 'elegirMundo'; mostrar('elegirMundo'); pintarMundos(); });
 $('btnMundoAzar').addEventListener('click', () => { sonido('click'); nuevaPartida(); });
+$('btnMiMundo').addEventListener('click', () => {
+  const m = cargarMundo();
+  if (!m || !m.length) { sonido('golpe'); abrirCreador(); return; }
+  sonido('click'); nuevaPartida(m);
+});
+$('btnCrearMundo').addEventListener('click', () => { sonido('click'); abrirCreador(); });
+function pintarMundos() {
+  const m = cargarMundo();
+  $('miMundoInfo').textContent = m && m.length ? `${m.length} formas` : 'aún no lo creas';
+  $('btnMiMundo').classList.toggle('desactivada', !(m && m.length));
+}
+const editorMundo = crearEditorMundo({
+  renderer, R, sonido, $,
+  alProbar: (formas) => { nuevaPartida(formas); volverAlCreador = true; },
+  alSalir: () => { estado = 'elegirMundo'; mostrar('elegirMundo'); pintarMundos(); },
+});
+function abrirCreador(formas) { estado = 'crearMundo'; mostrar('crearMundo'); editorMundo.abrir(formas); }
 $('btnCerrarMundo').addEventListener('click', () => { sonido('click'); irAlMenu(); });
 $('btnEquipos').addEventListener('click', () => { iniciarAudio(); sonido('click'); ajustes.equipos = !ajustes.equipos; guardarAjustes(); pintarAjustes(); });
 $('btnNombre').addEventListener('click', () => {
@@ -1245,7 +1363,7 @@ function cerrarNombre(guardar) {
 $('btnNombreOk').addEventListener('click', () => { sonido('click'); cerrarNombre(true); });
 $('btnNombreCancelar').addEventListener('click', () => cerrarNombre(false));
 $('inputNombre').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') cerrarNombre(true); });
-$('btnOtra').addEventListener('click', () => { sonido('click'); nuevaPartida(); });
+$('btnOtra').addEventListener('click', () => { sonido('click'); const vuelve = volverAlCreador; nuevaPartida(formasPartida); volverAlCreador = vuelve; });
 $('btnMenu').addEventListener('click', () => { sonido('click'); irAlMenu(); });
 $('btnCerrar').addEventListener('click', () => { sonido('click'); irAlMenu(); });
 $('btnSalir').addEventListener('click', () => {
@@ -1258,6 +1376,7 @@ $('btnSalir').addEventListener('click', () => {
   const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
   if (App) App.addListener('backButton', () => {
     if ($('cajaNombre').style.display === 'flex') cerrarNombre(false);
+    else if (estado === 'crearMundo') { estado = 'elegirMundo'; mostrar('elegirMundo'); pintarMundos(); }
     else if (['jugando', 'fin', 'editor', 'tienda', 'elegirMundo'].includes(estado)) irAlMenu();
     else if (estado === 'menu') { estado = 'titulo'; mostrar('titulo'); }
     else App.exitApp();
@@ -1395,7 +1514,12 @@ function pintarTienda() {
   $('gemasTienda').textContent = `💎 ${tienda.gemas}`;
   $('gemasMenu').textContent = `💎 ${tienda.gemas}`;
   const items = Object.keys(PIEZAS).flatMap(r => PIEZAS[r].map(p => [r, p]));
-  $('productos').innerHTML = items.map(([r, p]) => {
+  const consumibles = CONSUMIBLES.map(c => `<div class="producto consumible">
+      <div class="prod-nombre">${c.nombre}</div>
+      <div class="prod-desc">${c.desc}. Tienes: <b>${tienda.botiquines}</b></div>
+      <button class="prod-btn cons-btn${tienda.gemas < c.precio ? ' falta' : ''}" data-c="${c.id}">💎 ${c.precio}</button>
+    </div>`).join('');
+  $('productos').innerHTML = consumibles + items.map(([r, p]) => {
     const tiene = tienda.compradas.includes(p.id);
     const alcanza = tienda.gemas >= p.precio;
     return `<div class="producto${tiene ? ' tiene' : ''}">
@@ -1404,7 +1528,15 @@ function pintarTienda() {
       <button class="prod-btn${!tiene && !alcanza ? ' falta' : ''}" data-id="${p.id}" data-r="${r}">${tiene ? 'COMPRADO ✓' : `💎 ${p.precio}`}</button>
     </div>`;
   }).join('');
-  for (const b of $('productos').querySelectorAll('.prod-btn')) {
+  for (const b of $('productos').querySelectorAll('.cons-btn')) {
+    b.addEventListener('click', () => {
+      const c = CONSUMIBLES.find(x => x.id === b.dataset.c);
+      if (comprarConsumible(c)) { sonido('click'); $('avisoTienda').textContent = `¡Compraste un ${c.nombre}! Tienes ${tienda.botiquines}.`; }
+      else { sonido('golpe'); $('avisoTienda').textContent = `Te faltan ${c.precio - tienda.gemas} 💎.`; }
+      pintarTienda();
+    });
+  }
+  for (const b of $('productos').querySelectorAll('.prod-btn:not(.cons-btn)')) {
     b.addEventListener('click', () => {
       const p = PIEZAS[b.dataset.r].find(x => x.id === b.dataset.id);
       if (tienda.compradas.includes(p.id)) return;
@@ -1425,3 +1557,4 @@ $('btnTienda').addEventListener('click', () => { iniciarAudio(); sonido('click')
 $('btnVolverTienda').addEventListener('click', () => { sonido('click'); irAlMenu(); });
 $('btnTiendaEditor').addEventListener('click', () => { sonido('click'); abrirEditor(); });
 pintarTienda();
+window.addEventListener('resize', () => { if (estado === 'crearMundo') editorMundo.redimensionar(); });

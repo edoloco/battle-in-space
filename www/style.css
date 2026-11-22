@@ -211,6 +211,10 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 .tarjeta-mundo { flex: 1; border: .8vh solid #fff; background: #39243f; color: #fff; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 1vh; font-family: inherit; position: relative; overflow: hidden; }
 .tarjeta-mundo:first-child { border-radius: 2vh 0 0 2vh; border-right-width: .4vh; }
+.tarjeta-mundo:nth-child(2) { border-left-width: .4vh; border-right-width: .4vh; }
+.tarjeta-mundo:active { background: #553366; }
+.tarjeta-mundo.desactivada { opacity: .45; }
+.mas.mini { font-size: 12vh; color: #ffd83b; }
 .tarjeta-mundo:last-child { border-radius: 0 2vh 2vh 0; border-left-width: .4vh; transform: skewX(-6deg); }
 .tarjeta-mundo:last-child > * { transform: skewX(6deg); }
 .tarjeta-mundo:last-child:active { background: #553366; }
@@ -229,3 +233,40 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   background: conic-gradient(rgba(92,255,224,.85) var(--carga, 0%), rgba(40,25,50,.8) 0); }
 #btnEspecial2.listo { box-shadow: 0 0 2.5vh #5cffe0; }
 #btnEspecial2 img { max-width: 75%; max-height: 75%; pointer-events: none; }
+
+#btnTurbo10 { position: absolute; right: calc(3vw + 54vh); bottom: 50vh; width: 14vh; height: 14vh; font-size: 6vh;
+  background: conic-gradient(rgba(47,208,255,.9) var(--carga, 0%), rgba(40,25,50,.8) 0); }
+#btnTurbo10.listo { box-shadow: 0 0 2.5vh #2fd0ff; }
+#btnBotiquin { position: absolute; left: 3vw; bottom: 45vh; width: 13vh; height: 13vh; font-size: 6vh; background: rgba(40,25,50,.8); }
+#btnBotiquin::after { content: attr(data-n); position: absolute; right: -1vh; top: -1vh; background: #ff5a8a; color: #fff;
+  border-radius: 50%; min-width: 4.5vh; height: 4.5vh; font-size: 3vh; line-height: 4.5vh; text-align: center; }
+.producto.consumible { background: #2f7a8a; }
+
+/* ---------- CREAR MUNDO 3D ---------- */
+#crearMundo { background: transparent; }
+#vistaMundo { position: absolute; left: 0; top: 0; bottom: 0; width: 58%; touch-action: none; }
+.titulo-crear { position: absolute; top: 2vh; left: 2vw; color: #fff; font-size: 5.5vh; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+.titulo-crear small { font-size: .55em; color: #ffd83b; }
+#ayudaMundo { position: absolute; bottom: 2vh; left: 2vw; width: 54%; color: #fff; font-size: 3.2vh; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+.zoom { position: absolute; left: 2vw; top: 12vh; display: flex; flex-direction: column; gap: 1.5vh; }
+.zoom button { width: 9vh; height: 9vh; border-radius: 50%; background: rgba(40,25,50,.8); color: #fff; border: .5vh solid #fff; font-size: 5vh; line-height: 1; }
+.panel-mundo { position: absolute; right: 0; top: 0; bottom: 0; width: 42%; background: #8e2bb8; border-left: 1vh solid #111;
+  display: flex; gap: 1.5vw; padding: 2vh 1.5vw; }
+.tablas { flex: 1; display: flex; flex-direction: column; gap: 1.2vh; min-width: 0; }
+.tabla-titulo { color: #111; font-size: 3.8vh; }
+#tablaFormas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1vh; }
+#tablaFormas button { background: #a44ad0; border: .6vh solid #111; border-radius: 10px; color: #fff; padding: .5vh 0;
+  display: flex; flex-direction: column; align-items: center; font-family: inherit; }
+#tablaFormas button span { font-size: 6vh; line-height: 1.1; }
+#tablaFormas button small { font-size: 2.2vh; }
+#tablaColores { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1vh; }
+#tablaColores button { aspect-ratio: 1.4; border-radius: 8px; border: .5vh solid #111; }
+#tablaFormas button.sel, #tablaColores button.sel { outline: .7vh solid #ffd83b; outline-offset: 0; }
+.ajuste-mundo { color: #fff; font-size: 3.4vh; text-shadow: 2px 2px 0 #000; display: flex; justify-content: space-between; align-items: center; }
+.ajuste-mundo b { color: #111; text-shadow: none; font-size: 5vh; padding: 0 1.5vw; cursor: pointer; }
+.opciones-mundo { width: 24%; display: flex; flex-direction: column; gap: 2vh; justify-content: center; }
+.opciones-mundo button { flex: 1; border-radius: 12px; border: .6vh solid #111; font-family: inherit; font-size: 3.4vh; padding: 0 .5vw; }
+#btnBorrarForma { background: #e53935; color: #fff; }
+#btnBorrarForma.activo { background: #ffd83b; color: #111; animation: parpadeo 1s infinite; }
+#btnProbarMundo { background: #4bd16b; }
+#btnGuardarMundo { background: #4e0a66; color: #fff; }

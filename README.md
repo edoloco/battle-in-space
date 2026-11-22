@@ -20,7 +20,8 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 - **COPILOTO:** otro piloto que te acompaña; su especial queda en un segundo botón (se recarga más lento).
 - **EQUIPOS ON/OFF:** con equipos, la mitad de los rivales son tus aliados (no se dañan entre ustedes). Si te eliminan, miras a un aliado hasta que termine.
 - **EDITAR SU NOMBRE:** tu nombre aparece en la partida.
-- **JUGAR → MUNDO AL AZAR:** cada partida tiene un mundo distinto (colores y cantidad de asteroides). Mundo personalizado y crear mundo 3D: pronto.
+- **JUGAR → MUNDO AL AZAR:** cada partida tiene un mundo distinto (colores y cantidad de asteroides).
+- **JUGAR → CREAR MUNDO 3D:** tabla de formas (círculo, cuadrado, rectángulo, triángulo), tabla de colores, tamaño y altura; opciones BORRAR, PROBAR y SALIR Y GUARDAR. **MI MUNDO** juega en el mundo guardado.
 - **BUSCAR ACTUALIZACIONES** revisa si hay un APK nuevo en GitHub y lo descarga.
 
 ## Pilotos
@@ -36,13 +37,16 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 | Tentaclesilla Storm | Rayo enredante: atrapa, frena y daña de a poco a los que están cerca |
 | Kirby | Aspira a los rivales de adelante y después tira un misil estrella |
 | Ms. Loquín | Muchos misiles a lo loco |
+| Caine | Buguea la nave y tira un rayo muy bugeado donde apunta |
 
-En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, V especial del copiloto, G escudo, M misiles.
+En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, V especial del copiloto, G escudo, M misiles, B élitras avanzadas, H botiquín.
 
 ## Gemas, tienda y editor de nave
 
 - Ganas **5 💎** por cada rival que derribas y **2 💎** por cada cristal que encuentras flotando en la partida.
 - **Tienda:** Élitras simples (100, más rápida) · Élitras protectoras (309, botón 🛡 de escudo por 4 s) · Élitras pesadas (500, más lenta pero recibe la mitad del daño) · Tirador de fuego triple (260, tres láseres) · Tirador de fuego rápido (100, muy rápido pero recarga cada 40 tiros) · Tirador de fuego láser (480, láser muy largo que dura poco) · Ametralladora láser (701, chain gun amarilla de 150 disparos que se recarga sola mientras no la usas) · Misiles triples verdes (100, botón 🚀: tres misiles que se esparcen).
+- Nuevos: Élitras avanzadas (400, botón ⚡: más rápido por 10 s) · Élitras protectoras 2 (480, escudo de 8 s) · Proyectiles arcoíris (690, botón 🌈: explotan con arcoíris y brillantina) · Botiquín de energía (50, se compra varias veces; botón 🩹).
+- En las fases flotan **gasolina** ⛽ (recupera energía) y **corazones** ♥ (una vida más).
 - Se empieza el juego con **5 💎**.
 - **Editar nave:** élitras, zona central (la nave de cualquier piloto), tirador de fuego y misiles.
 
@@ -60,4 +64,4 @@ npx http-server www -p 8080
 
 ## Ideas para después (del menú de Víctor)
 
-Jugar en línea · Crear mundo 3D · Mundo personalizado · 4 proyectiles
+Jugar en línea · 4 proyectiles · Fondo del mundo 3D
