@@ -67,6 +67,7 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 #hud { pointer-events: none; }
 #hud > * { pointer-events: auto; }
 #hud .info, #hud #feed, #hud #mensaje, #hud .vida { pointer-events: none; }
+#mensaje small { font-size: .5em; }
 .vida {
   position: absolute; top: 2vh; left: 3vw; right: 12vw; height: 6vh;
   background: #c400f0; transform: skewX(-30deg); border-radius: 8px; overflow: hidden;
@@ -188,3 +189,43 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 #btnMisil { position: absolute; right: calc(3vw + 54vh); bottom: 14vh; width: 14vh; height: 14vh; font-size: 6vh;
   background: conic-gradient(rgba(92,255,110,.85) var(--carga, 0%), rgba(40,25,50,.8) 0); }
 #btnMisil.listo { box-shadow: 0 0 2.5vh #5cff6e; }
+
+/* ---------- menú en dos columnas (como el dibujo) ---------- */
+.grilla { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3vh 2vw; flex: 1; align-content: center; }
+.grilla .bar { min-height: 7.6vh; font-size: clamp(11px, 3.6vh, 24px); }
+.retratos { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; justify-content: center; }
+.retratos .retrato { height: 100%; }
+.retrato-cop { position: absolute; right: 0; bottom: 0; height: 38%; filter: drop-shadow(0 0 1vh rgba(255,255,255,.6)); }
+#copilotoNombre { color: #5cffe0; }
+#cajaNombre { position: absolute; inset: 0; display: none; align-items: flex-start; justify-content: center; background: rgba(20,10,30,.7); z-index: 5; padding-top: 6vh; }
+#cajaNombre .caja { background: #9d33c4; border: .8vh solid #111; border-radius: 16px; padding: 3vh 3vw; width: 60vw;
+  display: flex; flex-direction: column; gap: 2vh; color: #fff; font-size: 5vh; text-shadow: 2px 2px 0 #000; text-align: center; }
+#inputNombre { font-family: inherit; font-size: 6vh; padding: 1vh 2vw; border-radius: 10px; border: .5vh solid #111; text-align: center; user-select: text; -webkit-user-select: text; }
+
+/* ---------- JUGAR: elegir mundo ---------- */
+#elegirMundo { background: #39243f; }
+.titulo-mundo { position: absolute; top: 3vh; left: 0; right: 0; text-align: center; color: #fff; font-size: 13vh; }
+.cerrar-mundo { position: absolute; top: 2vh; right: 2vw; width: 11vh; height: 11vh; border-radius: 12px; background: transparent;
+  border: .7vh solid #fff; color: #fff; font-size: 7vh; }
+.mundos { position: absolute; left: 4vw; right: 4vw; top: 25vh; bottom: 8vh; display: flex; gap: 0; }
+.tarjeta-mundo { flex: 1; border: .8vh solid #fff; background: #39243f; color: #fff; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1vh; font-family: inherit; position: relative; overflow: hidden; }
+.tarjeta-mundo:first-child { border-radius: 2vh 0 0 2vh; border-right-width: .4vh; }
+.tarjeta-mundo:last-child { border-radius: 0 2vh 2vh 0; border-left-width: .4vh; transform: skewX(-6deg); }
+.tarjeta-mundo:last-child > * { transform: skewX(6deg); }
+.tarjeta-mundo:last-child:active { background: #553366; }
+.pronto-m { opacity: .45; }
+.mas { font-size: 22vh; line-height: 1; }
+.tm-nombre { font-size: 6vh; color: #c77de6; z-index: 1; }
+.tm-sub { font-size: 3.4vh; z-index: 1; }
+.estrellas { position: absolute; inset: 0; }
+.estrellas i { position: absolute; width: 1.4vh; height: 1.4vh; border-radius: 50%; background: #ddd; }
+.estrellas b { position: absolute; width: 7vh; height: 5vh; border-radius: 50%; border: .6vh solid #fff; }
+.estrellas i:nth-child(1){left:15%;top:20%} .estrellas i:nth-child(2){left:70%;top:15%} .estrellas i:nth-child(3){left:40%;top:75%}
+.estrellas i:nth-child(4){left:85%;top:60%} .estrellas i:nth-child(5){left:25%;top:55%} .estrellas i:nth-child(6){left:58%;top:40%}
+.estrellas b:nth-of-type(1){left:60%;top:12%} .estrellas b:nth-of-type(2){left:75%;top:35%;width:10vh;height:8vh} .estrellas b:nth-of-type(3){left:12%;top:68%}
+
+#btnEspecial2 { position: absolute; right: calc(3vw + 54vh); bottom: 32vh; width: 14vh; height: 14vh; font-size: 6vh;
+  background: conic-gradient(rgba(92,255,224,.85) var(--carga, 0%), rgba(40,25,50,.8) 0); }
+#btnEspecial2.listo { box-shadow: 0 0 2.5vh #5cffe0; }
+#btnEspecial2 img { max-width: 75%; max-height: 75%; pointer-events: none; }

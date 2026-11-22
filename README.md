@@ -17,6 +17,10 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 - **‹ϟ› Especial:** el poder de tu piloto (se recarga; brilla cuando está listo)
 - Gana el último que queda vivo. Las flechas rojas en el borde muestran dónde están los rivales.
 - En el menú se eligen el **PILOTO**, las **VIDAS** (1–9, iguales para todos) y los **RIVALES** (1–20).
+- **COPILOTO:** otro piloto que te acompaña; su especial queda en un segundo botón (se recarga más lento).
+- **EQUIPOS ON/OFF:** con equipos, la mitad de los rivales son tus aliados (no se dañan entre ustedes). Si te eliminan, miras a un aliado hasta que termine.
+- **EDITAR SU NOMBRE:** tu nombre aparece en la partida.
+- **JUGAR → MUNDO AL AZAR:** cada partida tiene un mundo distinto (colores y cantidad de asteroides). Mundo personalizado y crear mundo 3D: pronto.
 - **BUSCAR ACTUALIZACIONES** revisa si hay un APK nuevo en GitHub y lo descarga.
 
 ## Pilotos
@@ -33,7 +37,7 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 | Kirby | Aspira a los rivales de adelante y después tira un misil estrella |
 | Ms. Loquín | Muchos misiles a lo loco |
 
-En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, G escudo, M misiles.
+En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, V especial del copiloto, G escudo, M misiles.
 
 ## Gemas, tienda y editor de nave
 
@@ -56,4 +60,4 @@ npx http-server www -p 8080
 
 ## Ideas para después (del menú de Víctor)
 
-Editar nave · Tienda · Jugar en línea · Crear mundo 3D · Editar copiloto · Equipos · 4 proyectiles
+Jugar en línea · Crear mundo 3D · Mundo personalizado · 4 proyectiles

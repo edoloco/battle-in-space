@@ -7,7 +7,7 @@ import { PIEZAS, RANURAS, tienda, guardarTienda, sumarGemas, comprar, GEMAS_POR_
 // ============================================================
 // AJUSTES (se guardan en el teléfono)
 // ============================================================
-const ajustes = { vidas: 5, rivales: 10, piloto: 'victor' };
+const ajustes = { vidas: 5, rivales: 10, piloto: 'victor', copiloto: 'mspussles', nombre: '', equipos: false };
 try { Object.assign(ajustes, JSON.parse(localStorage.getItem('bis-ajustes') || '{}')); } catch (e) {}
 const LIMITES = { vidas: [1, 9], rivales: [1, 20] };
 function guardarAjustes() { try { localStorage.setItem('bis-ajustes', JSON.stringify(ajustes)); } catch (e) {} }
@@ -112,6 +112,7 @@ const texNebulosa = texturaRadial('rgba(190,110,230,0.55)', 'rgba(190,110,230,0)
 const texChispa = texturaRadial('rgba(255,255,255,1)', 'rgba(255,200,80,0)');
 
 // Nebulosas moradas de fondo
+const nebulosas = [];
 for (let i = 0; i < 9; i++) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texNebulosa, fog: false, transparent: true, depthWrite: false,
@@ -121,6 +122,7 @@ for (let i = 0; i < 9; i++) {
   s.position.copy(new THREE.Vector3().randomDirection().multiplyScalar(1300));
   const t = 500 + Math.random() * 700; s.scale.set(t, t, 1);
   scene.add(s);
+  nebulosas.push(s);
 }
 
 // Borde de la zona (esfera de malla muy suave)
@@ -133,10 +135,10 @@ scene.add(borde);
 // Asteroides
 const asteroides = [];
 const matAst = new THREE.MeshStandardMaterial({ color: 0x8c7a96, flatShading: true, roughness: 1 });
-function crearAsteroides() {
+function crearAsteroides(cuantos = 45) {
   for (const a of asteroides) scene.remove(a.mesh);
   asteroides.length = 0;
-  for (let i = 0; i < 45; i++) {
+  for (let i = 0; i < cuantos; i++) {
     const r = 6 + Math.random() * 22;
     const geo = new THREE.IcosahedronGeometry(r, 1);
     const p = geo.attributes.position;
@@ -154,6 +156,26 @@ function crearAsteroides() {
     scene.add(m);
     asteroides.push({ mesh: m, r: r * 0.95, giro: new THREE.Vector3(Math.random(), Math.random(), 0).multiplyScalar(0.3) });
   }
+}
+
+// Mundos al azar: cada partida cambia colores, nebulosas y cantidad de asteroides
+const MUNDOS = [
+  { nombre: 'Nebulosa Morada', fondo: 0x2a1d33, ast: 0x8c7a96, hue: 0.78, borde: 0xc070ff, asteroides: 45 },
+  { nombre: 'Galaxia Azul', fondo: 0x101a33, ast: 0x6f86a8, hue: 0.6, borde: 0x6fb8ff, asteroides: 40 },
+  { nombre: 'Sol Rojo', fondo: 0x2e1414, ast: 0x9a6a5a, hue: 0.02, borde: 0xff7a5c, asteroides: 50 },
+  { nombre: 'Pantano Verde', fondo: 0x10261a, ast: 0x6f9a74, hue: 0.36, borde: 0x6fffa0, asteroides: 45 },
+  { nombre: 'Lluvia de Asteroides', fondo: 0x1f1a24, ast: 0xa09080, hue: 0.1, borde: 0xffd27a, asteroides: 85 },
+  { nombre: 'Vacío Tranquilo', fondo: 0x0d0d16, ast: 0x77778a, hue: 0.7, borde: 0x9a9aff, asteroides: 15 },
+];
+let mundoActual = MUNDOS[0];
+function aplicarMundo(m) {
+  mundoActual = m;
+  scene.background.setHex(m.fondo);
+  scene.fog.color.setHex(m.fondo);
+  matAst.color.setHex(m.ast);
+  borde.material.color.setHex(m.borde);
+  for (const n of nebulosas) n.material.color.setHSL(m.hue + (Math.random() - 0.5) * 0.12, 0.7, 0.6);
+  crearAsteroides(m.asteroides);
 }
 
 // ============================================================
@@ -300,7 +322,7 @@ class Nave {
     this.yaw = 0; this.pitch = 0; this.alabeo = 0; this.giro = 0; this.giroT = 0;
     this.velocidad = esJugador ? 42 : 34;
     this.hpMax = esJugador ? 100 : 60; this.hp = this.hpMax;
-    this.vidas = ajustes.vidas; this.tReaparecer = 0;
+    this.vidas = ajustes.vidas; this.tReaparecer = 0; this.bando = 0;
     this.cdEspecial = esJugador ? 2 : 4 + Math.random() * 6;
     this.lento = 0;
     // efectos de las piezas
@@ -465,7 +487,7 @@ const especiales = crearEspeciales({ scene, naves, asteroides, danar, explosion,
 // ============================================================
 // CONTROLES TÁCTILES + TECLADO
 // ============================================================
-const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false, escudo: false, misil: false };
+const input = { x: 0, y: 0, fuego: false, turbo: false, especial: false, especial2: false, escudo: false, misil: false };
 const teclas = {};
 {
   const zona = $('joyZona'), base = $('joy'), knob = $('knob');
@@ -494,6 +516,7 @@ const teclas = {};
   boton($('btnEspecial'), () => input.especial = true, null);
   boton($('btnEscudo'), () => input.escudo = true, null);
   boton($('btnMisil'), () => input.misil = true, null);
+  boton($('btnEspecial2'), () => input.especial2 = true, null);
 }
 window.addEventListener('keydown', (e) => {
   teclas[e.code] = true;
@@ -501,6 +524,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyF' || e.code === 'KeyR') input.especial = true;
   if (e.code === 'KeyG') input.escudo = true;
   if (e.code === 'KeyM') input.misil = true;
+  if (e.code === 'KeyV') input.especial2 = true;
   if (e.code === 'Escape' && estado === 'jugando') irAlMenu();
 });
 window.addEventListener('keyup', (e) => { teclas[e.code] = false; });
@@ -531,10 +555,11 @@ function nuevaPartida() {
   for (const b of balas) scene.remove(b.mesh);
   balas.length = 0;
   especiales.limpiar();
-  crearAsteroides();
+  aplicarMundo(MUNDOS[Math.floor(Math.random() * MUNDOS.length)]);
 
   const mio = pilotoPorId(ajustes.piloto);
-  jugador = new Nave(mio, true, `${mio.nombre} (tú)`);
+  jugador = new Nave(mio, true, ajustes.nombre ? ajustes.nombre : `${mio.nombre} (tú)`);
+  jugador.bando = 0;
   naves.push(jugador);
   jugador.colocarAlAzar();
   // los rivales son los otros pilotos (si hay más rivales que pilotos, se repiten con número)
@@ -546,6 +571,8 @@ function nuevaPartida() {
     veces[pil.id] = (veces[pil.id] || 0) + 1;
     const nombre = veces[pil.id] > 1 || pil === mio ? `${pil.nombre} ${veces[pil.id] + (pil === mio ? 1 : 0)}` : pil.nombre;
     const n = new Nave(pil, false, nombre);
+    // modo equipos: la mitad (redondeando hacia abajo) son aliados; si no, todos contra todos
+    n.bando = ajustes.equipos ? (i < Math.floor(ajustes.rivales / 2) ? 0 : 1) : i + 1;
     naves.push(n);
     n.colocarAlAzar();
     n.cdDisparo = 2 + Math.random() * 2;
@@ -558,8 +585,12 @@ function nuevaPartida() {
   $('municion').style.display = ['rapido', 'ametralladora'].includes(jugador.equipo.tirador) ? '' : 'none';
   $('btnMisil').style.display = jugador.equipo.misiles ? '' : 'none';
   $('feed').innerHTML = '';
-  $('mensaje').textContent = '¡A LUCHAR!';
-  setTimeout(() => { if ($('mensaje').textContent === '¡A LUCHAR!') $('mensaje').textContent = ''; }, 1500);
+  $('mensaje').innerHTML = `¡A LUCHAR!<br><small>${mundoActual.nombre}${ajustes.equipos ? ' · EQUIPOS' : ''}</small>`;
+  setTimeout(() => { if ($('mensaje').textContent.startsWith('¡A LUCHAR!')) $('mensaje').textContent = ''; }, 2200);
+  const cop = copilotoActual();
+  $('btnEspecial2').style.display = cop ? '' : 'none';
+  jugador.copiloto = cop; jugador.cdEspecial2 = 4;
+  if (cop) $('btnEspecial2').innerHTML = `<img src="img/pilotos/${cop.id}.png" alt="">`;
   posicionarCamara(true);
   estado = 'jugando';
   mostrar('hud');
@@ -619,6 +650,11 @@ function terminar(gano) {
   estado = 'fin';
   const puesto = personasVivas() + (gano ? 0 : 1);
   $('finTitulo').textContent = gano ? '¡GANASTE!' : 'FIN DEL JUEGO';
+  if (ajustes.equipos) {
+    $('finTitulo').textContent = gano ? '¡TU EQUIPO GANÓ!' : 'GANÓ EL OTRO EQUIPO';
+    $('finTexto').innerHTML = `Derribos: ${jugador.derribos}<br>💎 Gemas ganadas: ${gemasPartida} (tienes ${tienda.gemas})`;
+    mostrar('fin'); return;
+  }
   $('finTexto').innerHTML = (gano
     ? `Fuiste el último en pie.<br>Derribos: ${jugador.derribos}`
     : `Quedaste en el puesto #${puesto} de ${totalPersonas}<br>Derribos: ${jugador.derribos}`) +
@@ -630,7 +666,7 @@ function terminar(gano) {
 // IA DE LOS RIVALES
 // ============================================================
 function elegirObjetivo(n) {
-  const candidatos = naves.filter(o => o !== n && o.vivo);
+  const candidatos = naves.filter(o => o !== n && o.vivo && o.bando !== n.bando);
   if (!candidatos.length) return null;
   let mejor = null, mejorPuntaje = -Infinity;
   for (const c of candidatos) {
@@ -732,12 +768,24 @@ function actualizarJugador(dt) {
   const f = j.adelante(new THREE.Vector3());
   let mejorAng = 0.22;
   for (const n of naves) {
-    if (n === j || !n.vivo) continue;
+    if (n === j || !n.vivo || n.bando === j.bando) continue;
     _v.subVectors(n.pos, j.pos);
     const d = _v.length();
     if (d > 420) continue;
     const ang = f.angleTo(_v);
     if (ang < mejorAng) { mejorAng = ang; objetivoFijado = n; }
+  }
+
+  // especial del copiloto (segundo botón, se recarga más lento)
+  j.cdEspecial2 -= dt;
+  if (input.especial2) {
+    input.especial2 = false;
+    if (j.copiloto && j.cdEspecial2 <= 0) {
+      const dir = objetivoFijado ? _v2.copy(objetivoFijado.pos).sub(j.pos).normalize() : null;
+      especiales.usar(j, j.copiloto.especial, dir);
+      j.cdEspecial2 = j.copiloto.cd * 1.5;
+      avisar(`¡${j.copiloto.nombre} te ayuda!`);
+    }
   }
 
   // poder especial
@@ -816,7 +864,7 @@ function dispararHaz(nave, dir) {
   const fin = m.position.clone().addScaledVector(dir, LARGO);
   const seg = fin.clone().sub(m.position);
   for (const o of naves) {
-    if (o === nave || !o.vivo) continue;
+    if (o === nave || !o.vivo || o.bando === nave.bando) continue;
     const t = THREE.MathUtils.clamp(_v.subVectors(o.pos, m.position).dot(seg) / seg.lengthSq(), 0, 1);
     if (_v2.copy(m.position).addScaledVector(seg, t).distanceTo(o.pos) < 4.5) {
       danar(o, 16, nave); explosion(o.pos.clone(), false, 0xff9cff);
@@ -844,7 +892,7 @@ function actualizarBalas(dt) {
     b.vida -= dt;
     let choco = false;
     for (const n of naves) {
-      if (!n.vivo || n === b.dueno) continue;
+      if (!n.vivo || n === b.dueno || n.bando === b.dueno.bando) continue;
       if (n.pos.distanceToSquared(b.mesh.position) < 3.6 * 3.6) {
         danar(n, b.dano, b.dueno); choco = true;
         explosion(b.mesh.position.clone(), false, b.dueno.esJugador ? 0xff9cff : 0xff5050);
@@ -881,15 +929,15 @@ function choquesNaves() {
 // CÁMARA
 // ============================================================
 const camObjetivo = new THREE.Vector3();
-function posicionarCamara(instantanea, dt = 0.016) {
-  if (!jugador) return;
-  const f = jugador.adelante(new THREE.Vector3());
-  const atras = jugador.usandoTurbo ? 17 : 14;
-  camObjetivo.copy(jugador.pos).addScaledVector(f, -atras).add(_v.set(0, 4.5, 0));
+function posicionarCamara(instantanea, dt = 0.016, nave = jugador) {
+  if (!nave) return;
+  const f = nave.adelante(new THREE.Vector3());
+  const atras = nave.usandoTurbo ? 17 : 14;
+  camObjetivo.copy(nave.pos).addScaledVector(f, -atras).add(_v.set(0, 4.5, 0));
   if (instantanea) camera.position.copy(camObjetivo);
   else camera.position.lerp(camObjetivo, 1 - Math.exp(-7 * dt));
-  camera.lookAt(_v2.copy(jugador.pos).addScaledVector(f, 25));
-  const fovObj = jugador.usandoTurbo ? 82 : 70;
+  camera.lookAt(_v2.copy(nave.pos).addScaledVector(f, 25));
+  const fovObj = nave.usandoTurbo ? 82 : 70;
   camera.fov += (fovObj - camera.fov) * Math.min(1, dt * 4);
   camera.updateProjectionMatrix();
 }
@@ -902,7 +950,11 @@ function actualizarHUD() {
   if (!jugador) return;
   $('vidaFill').style.width = (jugador.hp / jugador.hpMax * 100) + '%';
   const vivas = personasVivas();
-  if (vivas !== vivasAntes) {
+  if (ajustes.equipos) {
+    const mios = naves.filter(n => n.bando === jugador.bando && n.vidas > 0).length;
+    const otros = naves.filter(n => n.bando !== jugador.bando && n.vidas > 0).length;
+    $('vivas').innerHTML = `<span style="color:#5cffe0">${mios}</span> vs <span style="color:#ff6b6b">${otros}</span><br><small>TU EQUIPO vs RIVALES</small>`;
+  } else if (vivas !== vivasAntes) {
     $('vivas').innerHTML = `${vivas}/${totalPersonas}<br><small>PERSONAS VIVAS</small>`;
     vivasAntes = vivas;
   }
@@ -915,6 +967,11 @@ function actualizarHUD() {
   btnE.classList.toggle('listo', listo);
   $('turboFill').style.width = (jugador.turbo * 100) + '%';
   $('gemasHud').textContent = `💎 ${tienda.gemas}`;
+  if (jugador.copiloto) {
+    const b2 = $('btnEspecial2'), listo2 = jugador.cdEspecial2 <= 0;
+    b2.style.setProperty('--carga', (listo2 ? 100 : 100 - jugador.cdEspecial2 / (jugador.copiloto.cd * 1.5) * 100) + '%');
+    b2.classList.toggle('listo', listo2);
+  }
   if (jugador.burbuja) {
     const b = $('btnEscudo'), listoE = jugador.cdEscudo <= 0;
     b.style.setProperty('--carga', (listoE ? 100 : 100 - jugador.cdEscudo / 15 * 100) + '%');
@@ -987,6 +1044,7 @@ function dibujarHUD2D() {
 
   for (const n of naves) {
     if (n.esJugador || !n.vivo) continue;
+    const aliado = n.bando === jugador.bando;
     const p = _v2.copy(n.pos).project(camera);
     const detras = p.z > 1;
     let x = (p.x + 1) / 2 * W, y = (1 - p.y) / 2 * H;
@@ -997,7 +1055,7 @@ function dibujarHUD2D() {
       const ancho = THREE.MathUtils.clamp(1600 / dist, 18, 70) * s;
       const by = y - ancho * 0.55;
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x - ancho / 2, by, ancho, 5 * s);
-      ctx.fillStyle = '#e89cff'; ctx.fillRect(x - ancho / 2, by, ancho * n.hp / n.hpMax, 5 * s);
+      ctx.fillStyle = aliado ? '#5cffe0' : '#e89cff'; ctx.fillRect(x - ancho / 2, by, ancho * n.hp / n.hpMax, 5 * s);
       if (n === objetivoFijado) {
         ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 3 * s;
         ctx.beginPath(); ctx.arc(x, y, ancho * 0.45, 0, Math.PI * 2); ctx.stroke();
@@ -1009,8 +1067,8 @@ function dibujarHUD2D() {
           ctx.stroke();
         }
       }
-      if (dist < 250) {
-        ctx.fillStyle = '#fff'; ctx.font = `${11 * s}px Marker, sans-serif`; ctx.textAlign = 'center';
+      if (dist < 250 || aliado) {
+        ctx.fillStyle = aliado ? '#5cffe0' : '#fff'; ctx.font = `${11 * s}px Marker, sans-serif`; ctx.textAlign = 'center';
         ctx.fillText(`${n.nombre} ${'♥'.repeat(Math.max(0, n.vidas))}`, x, by - 4 * s);
       }
     } else {
@@ -1022,7 +1080,7 @@ function dibujarHUD2D() {
       const k = Math.min((W / 2 - m) / Math.abs(Math.cos(ang) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(ang) || 1e-6));
       const ex = W / 2 + Math.cos(ang) * k, ey = H / 2 + Math.sin(ang) * k;
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang);
-      ctx.fillStyle = '#e8352f'; ctx.globalAlpha = 0.85;
+      ctx.fillStyle = aliado ? '#5cffe0' : '#e8352f'; ctx.globalAlpha = aliado ? 0.6 : 0.85;
       ctx.beginPath(); ctx.moveTo(16 * s, 0); ctx.lineTo(-10 * s, -11 * s); ctx.lineTo(-10 * s, 11 * s); ctx.closePath(); ctx.fill();
       ctx.restore();
     }
@@ -1086,15 +1144,26 @@ function bucle(ahora) {
     actualizarBalas(dt);
     choquesNaves();
     if (jugador.vivo) posicionarCamara(false, dt);
+    else if (ajustes.equipos && jugador.vidas <= 0) {
+      // modo espectador: mira a un aliado que sigue luchando
+      const aliado = naves.find(n => n.bando === jugador.bando && n.vivo);
+      if (aliado) { posicionarCamara(false, dt, aliado); $('mensaje').innerHTML = `<small>MIRANDO A ${aliado.nombre.toUpperCase()}</small>`; }
+    }
 
-    const rivalesVivos = naves.some(n => !n.esJugador && n.vidas > 0);
-    if (!rivalesVivos || jugador.vidas <= 0) {
-      tFin += dt;
-      if (tFin > 1.8) terminar(!rivalesVivos && jugador.vidas > 0);
+    if (ajustes.equipos) {
+      const enemigos = naves.some(n => n.bando !== jugador.bando && n.vidas > 0);
+      const aliados = naves.some(n => n.bando === jugador.bando && n.vidas > 0);
+      if (!enemigos || !aliados) { tFin += dt; if (tFin > 1.8) terminar(!enemigos); }
+    } else {
+      const rivalesVivos = naves.some(n => !n.esJugador && n.vidas > 0);
+      if (!rivalesVivos || jugador.vidas <= 0) {
+        tFin += dt;
+        if (tFin > 1.8) terminar(!rivalesVivos && jugador.vidas > 0);
+      }
     }
     hudT -= dt;
     if (hudT <= 0) { actualizarHUD(); hudT = 0.1; }
-  } else if (estado === 'menu' || estado === 'titulo') {
+  } else if (estado === 'menu' || estado === 'titulo' || estado === 'elegirMundo') {
     // cámara girando lenta de fondo
     const t = ahora / 1000 * 0.05;
     camera.position.set(Math.sin(t) * 300, 60, Math.cos(t) * 300);
@@ -1114,12 +1183,22 @@ window.__juegoListo = true;
 // ============================================================
 // MENÚ Y BOTONES
 // ============================================================
+function copilotoActual() {
+  if (!ajustes.copiloto || ajustes.copiloto === ajustes.piloto) return null;
+  return PILOTOS.find(p => p.id === ajustes.copiloto) || null;
+}
 function pintarAjustes() {
   $('vVidas').textContent = ajustes.vidas; $('vRivales').textContent = ajustes.rivales;
   const p = pilotoPorId(ajustes.piloto);
   $('retrato').src = `img/pilotos/${p.id}.png`;
   $('pilotoNombre').textContent = p.nombre;
   $('pilotoEspecial').textContent = p.nombreEspecial;
+  const c = copilotoActual();
+  $('retratoCop').style.display = c ? '' : 'none';
+  if (c) $('retratoCop').src = `img/pilotos/${c.id}.png`;
+  $('copilotoNombre').textContent = c ? `Copiloto: ${c.nombre}` : 'Sin copiloto';
+  $('vEquipos').textContent = ajustes.equipos ? 'ON' : 'OFF';
+  $('nombreJugador').textContent = ajustes.nombre || 'EDITAR SU NOMBRE';
 }
 pintarAjustes();
 
@@ -1134,6 +1213,13 @@ for (const f of document.querySelectorAll('.flecha')) {
       pintarAjustes(); guardarAjustes();
       return;
     }
+    if (k === 'copiloto') { // opciones: ninguno + todos los pilotos menos el elegido
+      const ops = [null, ...PILOTOS.filter(p => p.id !== ajustes.piloto).map(p => p.id)];
+      const i = Math.max(0, ops.indexOf(copilotoActual() ? ajustes.copiloto : null));
+      ajustes.copiloto = ops[(i + Number(f.dataset.d) + ops.length) % ops.length];
+      pintarAjustes(); guardarAjustes();
+      return;
+    }
     const [mn, mx] = LIMITES[k];
     ajustes[k] += Number(f.dataset.d);
     if (ajustes[k] > mx) ajustes[k] = mn;
@@ -1141,7 +1227,24 @@ for (const f of document.querySelectorAll('.flecha')) {
     pintarAjustes(); guardarAjustes();
   });
 }
-$('btnJugar').addEventListener('click', () => { iniciarAudio(); sonido('click'); nuevaPartida(); });
+$('btnJugar').addEventListener('click', () => { iniciarAudio(); sonido('click'); estado = 'elegirMundo'; mostrar('elegirMundo'); });
+$('btnMundoAzar').addEventListener('click', () => { sonido('click'); nuevaPartida(); });
+$('btnCerrarMundo').addEventListener('click', () => { sonido('click'); irAlMenu(); });
+$('btnEquipos').addEventListener('click', () => { iniciarAudio(); sonido('click'); ajustes.equipos = !ajustes.equipos; guardarAjustes(); pintarAjustes(); });
+$('btnNombre').addEventListener('click', () => {
+  iniciarAudio(); sonido('click');
+  $('inputNombre').value = ajustes.nombre || '';
+  $('cajaNombre').style.display = 'flex';
+  setTimeout(() => $('inputNombre').focus(), 50);
+});
+function cerrarNombre(guardar) {
+  if (guardar) { ajustes.nombre = $('inputNombre').value.trim().slice(0, 14); guardarAjustes(); pintarAjustes(); }
+  $('cajaNombre').style.display = 'none';
+  $('inputNombre').blur();
+}
+$('btnNombreOk').addEventListener('click', () => { sonido('click'); cerrarNombre(true); });
+$('btnNombreCancelar').addEventListener('click', () => cerrarNombre(false));
+$('inputNombre').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') cerrarNombre(true); });
 $('btnOtra').addEventListener('click', () => { sonido('click'); nuevaPartida(); });
 $('btnMenu').addEventListener('click', () => { sonido('click'); irAlMenu(); });
 $('btnCerrar').addEventListener('click', () => { sonido('click'); irAlMenu(); });
@@ -1154,7 +1257,8 @@ $('btnSalir').addEventListener('click', () => {
 {
   const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
   if (App) App.addListener('backButton', () => {
-    if (estado === 'jugando' || estado === 'fin' || estado === 'editor' || estado === 'tienda') irAlMenu();
+    if ($('cajaNombre').style.display === 'flex') cerrarNombre(false);
+    else if (['jugando', 'fin', 'editor', 'tienda', 'elegirMundo'].includes(estado)) irAlMenu();
     else if (estado === 'menu') { estado = 'titulo'; mostrar('titulo'); }
     else App.exitApp();
   });

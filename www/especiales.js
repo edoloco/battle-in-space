@@ -40,7 +40,8 @@ function distSegmento(p, a, b) {
 
 export function crearEspeciales({ scene, naves, asteroides, danar, explosion, sonido, jugador }) {
   const activos = [];
-  const rivalesDe = (n) => naves.filter(o => o !== n && o.vivo);
+  // rivales = naves vivas de otro bando (en modo equipos, los aliados no se dañan)
+  const rivalesDe = (n) => naves.filter(o => o !== n && o.vivo && o.bando !== n.bando);
   const cercaDelJugador = (pos) => { const j = jugador(); return j ? Math.max(0.15, 1 - j.pos.distanceTo(pos) / 450) : 1; };
   const tocaAsteroide = (p, extra = 0) => asteroides.some(a => a.mesh.position.distanceToSquared(p) < (a.r + extra) ** 2);
 
@@ -58,7 +59,7 @@ export function crearEspeciales({ scene, naves, asteroides, danar, explosion, so
 
   function areaDano(centro, radio, dano, dueno) {
     for (const o of naves) {
-      if (!o.vivo || o === dueno) continue;
+      if (!o.vivo || o === dueno || o.bando === dueno.bando) continue;
       const d = o.pos.distanceTo(centro);
       if (d < radio) danar(o, dano * (1 - 0.5 * d / radio), dueno);
     }
