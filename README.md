@@ -41,6 +41,13 @@ Juego de naves 3D para Android, al estilo Star Fox. Idea, dibujos y diseño: **V
 
 En el PC: flechas o WASD, Espacio dispara, Shift turbo, Q/E giro, F especial, V especial del copiloto, G escudo, M misiles, B élitras avanzadas, H botiquín.
 
+## Jugar en línea
+
+- **JUGAR EN LÍNEA → CREAR SALA:** aparece un código de 4 letras. Los demás tocan **UNIRSE** y lo escriben.
+- Hasta **8 jugadores**. El anfitrión elige el modo (todos contra todos o equipos), los **bots** (0 a 12), las vidas y el mundo (al azar o el suyo). 1 contra 1 = 2 jugadores y 0 bots.
+- Se necesita internet solo para encontrarse (servidor gratuito de PeerJS); el juego va directo entre los teléfonos.
+- Versión web para jugar desde un computador: https://edoloco.github.io/battle-in-space/ (activar una vez en Settings → Pages → Source: GitHub Actions).
+
 ## Gemas, tienda y editor de nave
 
 - Ganas **5 💎** por cada rival que derribas y **2 💎** por cada cristal que encuentras flotando en la partida.
@@ -64,4 +71,4 @@ npx http-server www -p 8080
 
 ## Ideas para después (del menú de Víctor)
 
-Jugar en línea · 4 proyectiles · Fondo del mundo 3D
+4 proyectiles · Fondo del mundo 3D

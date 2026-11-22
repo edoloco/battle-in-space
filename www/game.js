@@ -3,6 +3,7 @@
 import * as THREE from './lib/three.module.js';
 import { PILOTOS, USO_IA, crearEspeciales } from './especiales.js';
 import { crearEditorMundo, cargarMundo, mallaForma, choquesForma } from './mundo3d.js';
+import { red, crearSala, unirse, empezarPartida, volverASala, enviarSala, enviarEstado, enviarEv, salir as salirRed, MAX_JUGADORES } from './red.js';
 import { PIEZAS, RANURAS, CONSUMIBLES, tienda, guardarTienda, sumarGemas, comprar, comprarConsumible, GEMAS_POR_DERRIBO, GEMAS_POR_CRISTAL } from './tienda.js';
 
 // ============================================================
@@ -325,11 +326,14 @@ const naves = [];
 let jugador = null;
 
 class Nave {
-  constructor(piloto, esJugador, nombre) {
+  constructor(piloto, esJugador, nombre, opts = {}) {
     this.piloto = piloto; this.nombre = nombre || piloto.nombre; this.esJugador = esJugador;
-    this.equipo = esJugador ? equipoValido() : {};
+    // en línea: remoto = la maneja otro teléfono; esPersona = jugador humano (no bot)
+    this.remoto = !!opts.remoto; this.esPersona = esJugador || !!opts.esPersona; this.netId = opts.netId || null;
+    this.netPos = new THREE.Vector3(); this.netYaw = 0; this.netPitch = 0; this.sinDatos = this.remoto;
+    this.equipo = esJugador ? equipoValido() : (opts.equipo || {});
     const central = this.equipo.central ? pilotoPorId(this.equipo.central) : null;
-    this.color = esJugador ? (central ? central.color : 0xf2f2f2) : piloto.color;
+    this.color = this.esPersona ? (central ? central.color : 0xf2f2f2) : piloto.color;
     this.modelo = crearModeloNave(this.color, central ? central.acento : piloto.acento, this.equipo);
     this.obj = new THREE.Group(); this.obj.add(this.modelo); scene.add(this.obj);
     this.obj.rotation.order = 'YXZ';
@@ -337,7 +341,7 @@ class Nave {
     this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0; this.alabeo = 0; this.giro = 0; this.giroT = 0;
     this.velocidad = esJugador ? 42 : 34;
-    this.hpMax = esJugador ? 100 : 60; this.hp = this.hpMax;
+    this.hpMax = this.esPersona ? 100 : 60; this.hp = this.hpMax;
     this.vidas = ajustes.vidas; this.tReaparecer = 0; this.bando = 0;
     this.cdEspecial = esJugador ? 2 : 4 + Math.random() * 6;
     this.lento = 0;
@@ -429,10 +433,10 @@ const matBalaAmarilla = new THREE.MeshBasicMaterial({ color: 0xffe14b });
 let ladoCadena = 1;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
 
-function disparar(nave, dirApuntada) {
-  const esJ = nave.esJugador;
+function disparar(nave, dirApuntada, desdeRed) {
+  const esJ = nave.esPersona;
   const dir = dirApuntada ? dirApuntada.clone() : nave.adelante();
-  if (!esJ) { // los rivales fallan un poco
+  if (!esJ && !desdeRed) { // los rivales fallan un poco
     dir.x += (Math.random() - 0.5) * 0.06; dir.y += (Math.random() - 0.5) * 0.06; dir.z += (Math.random() - 0.5) * 0.06;
     dir.normalize();
   }
@@ -451,8 +455,18 @@ function disparar(nave, dirApuntada) {
     scene.add(m);
     balas.push({ mesh: m, vel: dir.clone().multiplyScalar(cadena ? 340 : 280).add(nave.vel), vida: 1.6, dueno: nave, dano: cadena ? 6 : esJ ? 10 : 7 });
   }
-  if (esJ) sonido('laser', cadena ? 0.35 : 1);
+  if (nave.esJugador) sonido('laser', cadena ? 0.35 : 1);
   else if (jugador && nave.pos.distanceTo(jugador.pos) < 200) sonido('laserEnemigo', 0.5);
+  if (red.activa && !nave.remoto && !desdeRed) enviarEv({ tipo: 'disparo', id: nave.netId, d: [dir.x, dir.y, dir.z] });
+}
+
+// especiales: en línea también se avisan a los demás
+function usarEspecial(nave, tipo, dir, desdeRed) {
+  especiales.usar(nave, tipo, dir);
+  if (red.activa && !nave.remoto && !desdeRed) {
+    const d = dir || nave.adelante(new THREE.Vector3());
+    enviarEv({ tipo: 'especial', id: nave.netId, esp: tipo, d: [d.x, d.y, d.z] });
+  }
 }
 
 // ============================================================
@@ -563,7 +577,7 @@ function hacerGiro() {
 // ESTADO DEL JUEGO
 // ============================================================
 let estado = 'titulo';
-let totalPersonas = 0, tFin = 0, gemasPartida = 0;
+let totalPersonas = 0, tFin = 0, gemasPartida = 0, modoEquipos = false;
 let objetivoFijado = null;
 
 function mostrar(id) {
@@ -573,6 +587,7 @@ function mostrar(id) {
 let formasPartida = null, volverAlCreador = false;
 function nuevaPartida(formas = null) {
   formasPartida = formas;
+  modoEquipos = ajustes.equipos;
   // limpiar
   for (const n of naves) scene.remove(n.obj);
   naves.length = 0;
@@ -612,7 +627,7 @@ function nuevaPartida(formas = null) {
   $('btnMisil').textContent = jugador.equipo.misiles === 'arcoiris' ? '🌈' : '🚀';
   $('btnTurbo10').style.display = jugador.equipo.elitras === 'avanzadas' ? '' : 'none';
   $('feed').innerHTML = '';
-  $('mensaje').innerHTML = `¡A LUCHAR!<br><small>${mundoActual.nombre}${ajustes.equipos ? ' · EQUIPOS' : ''}</small>`;
+  $('mensaje').innerHTML = `¡A LUCHAR!<br><small>${mundoActual.nombre}${modoEquipos ? ' · EQUIPOS' : ''}</small>`;
   setTimeout(() => { if ($('mensaje').textContent.startsWith('¡A LUCHAR!')) $('mensaje').textContent = ''; }, 2200);
   const cop = copilotoActual();
   $('btnEspecial2').style.display = cop ? '' : 'none';
@@ -654,6 +669,7 @@ function curar(nave, cant) {
 }
 
 function danar(nave, cant, atacante, silencioso) {
+  if (nave.remoto) return; // en línea, cada teléfono decide el daño de sus propias naves
   if (!nave.vivo || nave.invulnerable > 0) return;
   if (nave.escudo > 0) return;
   nave.hp -= cant * nave.defensa;
@@ -664,6 +680,7 @@ function danar(nave, cant, atacante, silencioso) {
     const dist = jugador ? nave.pos.distanceTo(jugador.pos) : 0;
     sonido('explosion', nave.esJugador ? 1 : Math.max(0.15, 1 - dist / 400));
     if (atacante) atacante.derribos++;
+    if (red.activa) enviarEv({ tipo: 'derribo', v: nave.netId, a: atacante ? atacante.netId : null, vidas: nave.vidas - 1 });
     if (atacante && atacante.esJugador && !nave.esJugador) {
       sumarGemas(GEMAS_POR_DERRIBO); gemasPartida += GEMAS_POR_DERRIBO;
       avisar(`+${GEMAS_POR_DERRIBO} 💎`);
@@ -684,9 +701,11 @@ function danar(nave, cant, atacante, silencioso) {
 
 function terminar(gano) {
   estado = 'fin';
+  $('btnOtra').querySelector('span').textContent = red.activa && !red.host ? 'ESPERANDO AL ANFITRIÓN' : 'OTRA VEZ';
+  $('btnMenu').querySelector('span').textContent = red.activa ? 'VOLVER A LA SALA' : 'MENÚ';
   const puesto = personasVivas() + (gano ? 0 : 1);
   $('finTitulo').textContent = gano ? '¡GANASTE!' : 'FIN DEL JUEGO';
-  if (ajustes.equipos) {
+  if (modoEquipos) {
     $('finTitulo').textContent = gano ? '¡TU EQUIPO GANÓ!' : 'GANÓ EL OTRO EQUIPO';
     $('finTexto').innerHTML = `Derribos: ${jugador.derribos}<br>💎 Gemas ganadas: ${gemasPartida} (tienes ${tienda.gemas})`;
     mostrar('fin'); return;
@@ -754,7 +773,7 @@ function actualizarIA(n, dt) {
     n.cdEspecial -= dt;
     const uso = USO_IA[n.piloto.especial];
     if (n.cdEspecial <= 0 && dist < uso.dist && ang < uso.ang) {
-      especiales.usar(n, n.piloto.especial, _v2.copy(dir).normalize());
+      usarEspecial(n, n.piloto.especial, _v2.copy(dir).normalize());
       n.cdEspecial = n.piloto.cd * (1.4 + Math.random());
     }
   } else dir.copy(n.adelante());
@@ -818,7 +837,7 @@ function actualizarJugador(dt) {
     input.especial2 = false;
     if (j.copiloto && j.cdEspecial2 <= 0) {
       const dir = objetivoFijado ? _v2.copy(objetivoFijado.pos).sub(j.pos).normalize() : null;
-      especiales.usar(j, j.copiloto.especial, dir);
+      usarEspecial(j, j.copiloto.especial, dir);
       j.cdEspecial2 = j.copiloto.cd * 1.5;
       avisar(`¡${j.copiloto.nombre} te ayuda!`);
     }
@@ -831,7 +850,7 @@ function actualizarJugador(dt) {
     if (j.cdEspecial <= 0) {
       let dir = null;
       if (objetivoFijado) dir = _v2.copy(objetivoFijado.pos).sub(j.pos).normalize();
-      especiales.usar(j, j.piloto.especial, dir);
+      usarEspecial(j, j.piloto.especial, dir);
       j.cdEspecial = j.piloto.cd;
     }
   }
@@ -872,7 +891,7 @@ function actualizarJugador(dt) {
     input.misil = false;
     if (j.equipo.misiles && j.cdMisil <= 0) {
       const dir = objetivoFijado ? _v2.copy(objetivoFijado.pos).sub(j.pos).normalize() : null;
-      especiales.usar(j, j.equipo.misiles === 'arcoiris' ? 'misilesArcoiris' : 'misilesVerdes', dir);
+      usarEspecial(j, j.equipo.misiles === 'arcoiris' ? 'misilesArcoiris' : 'misilesVerdes', dir);
       j.cdMisil = j.equipo.misiles === 'arcoiris' ? 7 : 6;
     }
   }
@@ -911,7 +930,8 @@ function actualizarJugador(dt) {
 
 // Tirador de fuego láser: un láser muy largo que dura poco
 const haces = [];
-function dispararHaz(nave, dir) {
+function dispararHaz(nave, dir, desdeRed) {
+  if (red.activa && !nave.remoto && !desdeRed) enviarEv({ tipo: 'haz', id: nave.netId, d: [dir.x, dir.y, dir.z] });
   const LARGO = 340;
   const geo = new THREE.CylinderGeometry(0.5, 0.5, LARGO, 8, 1, true);
   geo.rotateX(Math.PI / 2); geo.translate(0, 0, LARGO / 2);
@@ -929,7 +949,7 @@ function dispararHaz(nave, dir) {
     }
   }
   haces.push({ m, t: 0 });
-  sonido('laser'); sonido('turbo', 0.4);
+  if (nave.esJugador) { sonido('laser'); sonido('turbo', 0.4); }
 }
 function actualizarHaces(dt) {
   for (let i = haces.length - 1; i >= 0; i--) {
@@ -968,7 +988,7 @@ function actualizarBalas(dt) {
 
 function choquesNaves() {
   for (const n of naves) {
-    if (!n.vivo) continue;
+    if (!n.vivo || n.remoto) continue;
     for (const a of asteroides) {
       _v.subVectors(n.pos, a.mesh.position);
       const d = _v.length(), min = a.r + 2.2;
@@ -1008,7 +1028,7 @@ function actualizarHUD() {
   if (!jugador) return;
   $('vidaFill').style.width = (jugador.hp / jugador.hpMax * 100) + '%';
   const vivas = personasVivas();
-  if (ajustes.equipos) {
+  if (modoEquipos) {
     const mios = naves.filter(n => n.bando === jugador.bando && n.vidas > 0).length;
     const otros = naves.filter(n => n.bando !== jugador.bando && n.vidas > 0).length;
     $('vivas').innerHTML = `<span style="color:#5cffe0">${mios}</span> vs <span style="color:#ff6b6b">${otros}</span><br><small>TU EQUIPO vs RIVALES</small>`;
@@ -1225,11 +1245,12 @@ function bucle(ahora) {
 
   for (const a of asteroides) { a.mesh.rotation.x += a.giro.x * dt; a.mesh.rotation.y += a.giro.y * dt; }
 
-  if (estado === 'jugando') {
+  // en línea la partida sigue corriendo aunque yo haya terminado (los demás siguen jugando)
+  if (estado === 'jugando' || (estado === 'fin' && red.activa && jugador)) {
     if (jugador.vivo) actualizarJugador(dt);
     // reaparecer (jugador y rivales tienen las mismas vidas)
     for (const n of naves) {
-      if (n.vivo || n.vidas <= 0) continue;
+      if (n.remoto || n.vivo || n.vidas <= 0) continue;
       n.tReaparecer -= dt;
       if (n.tReaparecer <= 0) {
         n.vivo = true; n.hp = n.hpMax; n.turbo = 1; n.lento = 0;
@@ -1237,25 +1258,28 @@ function bucle(ahora) {
         if (n.esJugador) { $('mensaje').textContent = ''; posicionarCamara(true); }
       }
     }
-    for (const n of naves) if (!n.esJugador && n.vivo) actualizarIA(n, dt);
+    for (const n of naves) if (!n.esJugador && !n.remoto && n.vivo) actualizarIA(n, dt);
+    for (const n of naves) if (n.remoto) actualizarRemoto(n, dt);
+    if (red.activa) { tRed -= dt; if (tRed <= 0) { tRed = 1 / 15; mandarEstado(); } }
     especiales.actualizar(dt);
     actualizarCristales(dt);
     actualizarHaces(dt);
     actualizarBalas(dt);
     choquesNaves();
     if (jugador.vivo) posicionarCamara(false, dt);
-    else if (ajustes.equipos && jugador.vidas <= 0) {
+    else if (modoEquipos && jugador.vidas <= 0) {
       // modo espectador: mira a un aliado que sigue luchando
       const aliado = naves.find(n => n.bando === jugador.bando && n.vivo);
       if (aliado) { posicionarCamara(false, dt, aliado); $('mensaje').innerHTML = `<small>MIRANDO A ${aliado.nombre.toUpperCase()}</small>`; }
     }
 
-    if (ajustes.equipos) {
+    if (estado !== 'jugando') { /* ya terminé: solo sigo simulando */ }
+    else if (modoEquipos) {
       const enemigos = naves.some(n => n.bando !== jugador.bando && n.vidas > 0);
       const aliados = naves.some(n => n.bando === jugador.bando && n.vidas > 0);
       if (!enemigos || !aliados) { tFin += dt; if (tFin > 1.8) terminar(!enemigos); }
     } else {
-      const rivalesVivos = naves.some(n => !n.esJugador && n.vidas > 0);
+      const rivalesVivos = naves.some(n => n !== jugador && n.vidas > 0);
       if (!rivalesVivos || jugador.vidas <= 0) {
         tFin += dt;
         if (tFin > 1.8) terminar(!rivalesVivos && jugador.vidas > 0);
@@ -1263,7 +1287,7 @@ function bucle(ahora) {
     }
     hudT -= dt;
     if (hudT <= 0) { actualizarHUD(); hudT = 0.1; }
-  } else if (estado === 'menu' || estado === 'titulo' || estado === 'elegirMundo') {
+  } else if (['menu', 'titulo', 'elegirMundo', 'enLinea', 'sala'].includes(estado)) {
     // cámara girando lenta de fondo
     const t = ahora / 1000 * 0.05;
     camera.position.set(Math.sin(t) * 300, 60, Math.cos(t) * 300);
@@ -1363,9 +1387,25 @@ function cerrarNombre(guardar) {
 $('btnNombreOk').addEventListener('click', () => { sonido('click'); cerrarNombre(true); });
 $('btnNombreCancelar').addEventListener('click', () => cerrarNombre(false));
 $('inputNombre').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') cerrarNombre(true); });
-$('btnOtra').addEventListener('click', () => { sonido('click'); const vuelve = volverAlCreador; nuevaPartida(formasPartida); volverAlCreador = vuelve; });
-$('btnMenu').addEventListener('click', () => { sonido('click'); irAlMenu(); });
-$('btnCerrar').addEventListener('click', () => { sonido('click'); irAlMenu(); });
+$('btnOtra').addEventListener('click', () => {
+  sonido('click');
+  if (red.activa) { if (red.host) armarPartidaHost(); return; }
+  const vuelve = volverAlCreador; nuevaPartida(formasPartida); volverAlCreador = vuelve;
+});
+$('btnMenu').addEventListener('click', () => {
+  sonido('click');
+  if (red.activa) { if (red.host) volverASala(); estado = 'sala'; mostrar('sala'); pintarSala(); return; }
+  irAlMenu();
+});
+$('btnCerrar').addEventListener('click', () => {
+  sonido('click');
+  if (red.activa) {
+    enviarEv({ tipo: 'abandona', id: red.miId });
+    if (red.host) volverASala();
+    estado = 'sala'; mostrar('sala'); pintarSala(); return;
+  }
+  irAlMenu();
+});
 $('btnSalir').addEventListener('click', () => {
   const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
   if (App) App.exitApp(); else { estado = 'titulo'; mostrar('titulo'); }
@@ -1377,6 +1417,9 @@ $('btnSalir').addEventListener('click', () => {
   if (App) App.addListener('backButton', () => {
     if ($('cajaNombre').style.display === 'flex') cerrarNombre(false);
     else if (estado === 'crearMundo') { estado = 'elegirMundo'; mostrar('elegirMundo'); pintarMundos(); }
+    else if (estado === 'sala') $('btnSalirSala').click();
+    else if (estado === 'enLinea') $('btnCerrarEnLinea').click();
+    else if (red.activa && (estado === 'jugando' || estado === 'fin')) $('btnCerrar').click();
     else if (['jugando', 'fin', 'editor', 'tienda', 'elegirMundo'].includes(estado)) irAlMenu();
     else if (estado === 'menu') { estado = 'titulo'; mostrar('titulo'); }
     else App.exitApp();
@@ -1558,3 +1601,212 @@ $('btnVolverTienda').addEventListener('click', () => { sonido('click'); irAlMenu
 $('btnTiendaEditor').addEventListener('click', () => { sonido('click'); abrirEditor(); });
 pintarTienda();
 window.addEventListener('resize', () => { if (estado === 'crearMundo') editorMundo.redimensionar(); });
+
+// ============================================================
+// JUGAR EN LÍNEA (hasta 8 jugadores + bots)
+// ============================================================
+let tRed = 0;
+const naveDe = (id) => naves.find(n => n.netId === id);
+
+function estadoDe(n) {
+  const r = (v) => Math.round(v * 10) / 10;
+  return [n.netId, r(n.pos.x), r(n.pos.y), r(n.pos.z), r(n.yaw * 100) / 100, r(n.pitch * 100) / 100, r(n.alabeo * 10) / 10,
+    r(n.giro * 10) / 10, n.vivo ? 1 : 0, Math.round(n.hp), n.vidas, (n.usandoTurbo ? 1 : 0) | (n.escudo > 0 ? 2 : 0) | (n.invulnerable > 0 ? 4 : 0)];
+}
+function mandarEstado() {
+  if (!jugador) return;
+  if (red.host) enviarEstado(naves.filter(n => n.netId).map(estadoDe));
+  else enviarEstado([estadoDe(jugador)]);
+}
+function aplicarEstados(lista) {
+  if (estado !== 'jugando' && estado !== 'fin') return;
+  for (const e of lista) {
+    if (!e || e[0] === red.miId) continue;
+    const n = naveDe(e[0]);
+    if (!n || !n.remoto) continue;
+    const vivo = e[8] === 1;
+    n.netPos.set(e[1], e[2], e[3]); n.netYaw = e[4]; n.netPitch = e[5]; n.netAlabeo = e[6]; n.giro = e[7];
+    n.hp = e[9]; n.vidas = e[10]; n.usandoTurbo = !!(e[11] & 1); n.escudo = e[11] & 2 ? 1 : 0; n.parpadea = !!(e[11] & 4);
+    if (n.sinDatos || (vivo && !n.vivo)) { n.pos.copy(n.netPos); n.yaw = n.netYaw; n.pitch = n.netPitch; n.sinDatos = false; }
+    if (!vivo && n.vivo) explosion(n.pos.clone(), true);
+    n.vivo = vivo;
+  }
+}
+function actualizarRemoto(n, dt) {
+  if (n.sinDatos) { n.obj.visible = false; return; }
+  const antes = _v.copy(n.pos);
+  n.pos.lerp(n.netPos, Math.min(1, dt * 12));
+  n.vel.subVectors(n.pos, antes).divideScalar(Math.max(dt, 1e-3));
+  let dy = n.netYaw - n.yaw;
+  while (dy > Math.PI) dy -= Math.PI * 2;
+  while (dy < -Math.PI) dy += Math.PI * 2;
+  n.yaw += dy * Math.min(1, dt * 12);
+  n.pitch += (n.netPitch - n.pitch) * Math.min(1, dt * 12);
+  n.alabeo += ((n.netAlabeo || 0) - n.alabeo) * Math.min(1, dt * 8);
+  n.obj.rotation.set(-n.pitch, n.yaw, n.alabeo + n.giro);
+  n.obj.visible = n.vivo && !(n.parpadea && Math.floor(performance.now() / 80) % 2);
+  n.modelo.userData.fuego.scale.set(1, 1, (n.usandoTurbo ? 2.2 : 1) * (0.85 + Math.random() * 0.3));
+  if (n.burbuja) n.burbuja.visible = n.escudo > 0;
+}
+
+function alEventoRed(ev) {
+  if (!ev) return;
+  if (ev.tipo === 'seFue') {
+    const n = naveDe(ev.id);
+    if (n) { n.vidas = 0; n.vivo = false; n.obj.visible = false; avisar(`${n.nombre} se fue de la sala`); }
+    if (estado === 'sala') pintarSala();
+    return;
+  }
+  if (estado !== 'jugando' && estado !== 'fin') return;
+  const n = naveDe(ev.id);
+  const d = ev.d ? new THREE.Vector3(ev.d[0], ev.d[1], ev.d[2]).normalize() : null;
+  if (ev.tipo === 'disparo' && n && n.remoto) { n.obj.updateMatrixWorld(); disparar(n, d, true); }
+  else if (ev.tipo === 'haz' && n && n.remoto) dispararHaz(n, d, true);
+  else if (ev.tipo === 'especial' && n && n.remoto) usarEspecial(n, ev.esp, d, true);
+  else if (ev.tipo === 'derribo') {
+    const v = naveDe(ev.v), a = ev.a ? naveDe(ev.a) : null;
+    if (v && v.remoto) { v.vidas = ev.vidas; if (v.vivo) explosion(v.pos.clone(), true); v.vivo = false; v.obj.visible = false; }
+    if (a) a.derribos++;
+    if (a && a === jugador) {
+      sumarGemas(GEMAS_POR_DERRIBO); gemasPartida += GEMAS_POR_DERRIBO;
+      avisar(`¡Derribaste a ${v ? v.nombre : '?'}! +${GEMAS_POR_DERRIBO} 💎`);
+    } else if (v) avisar(`${a ? a.nombre : 'Un asteroide'} derribó a ${v.nombre}${ev.vidas > 0 ? '' : ' ¡ELIMINADO!'}`);
+  } else if (ev.tipo === 'abandona' && n) { n.vidas = 0; n.vivo = false; n.obj.visible = false; avisar(`${n.nombre} salió de la partida`); }
+}
+
+// generador de números al azar con semilla: todos ven el mismo mundo
+function azarConSemilla(semilla) {
+  let a = semilla >>> 0;
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+function nuevaPartidaRed(info) {
+  for (const n of naves) scene.remove(n.obj);
+  naves.length = 0;
+  for (const b of balas) scene.remove(b.mesh);
+  balas.length = 0;
+  especiales.limpiar();
+  volverAlCreador = false; formasPartida = null;
+  const original = Math.random;
+  Math.random = azarConSemilla(info.semilla);
+  try {
+    if (info.formas) aplicarMundoPropio(info.formas);
+    else aplicarMundo(MUNDOS[info.mundo % MUNDOS.length]);
+  } finally { Math.random = original; }
+  modoEquipos = info.modo === 'equipos';
+  for (const e of info.naves) {
+    const pil = pilotoPorId(e.piloto);
+    if (e.id === red.miId) {
+      jugador = new Nave(pil, true, e.nombre, { netId: e.id });
+      jugador.bando = e.bando; jugador.vidas = info.vidas;
+      naves.push(jugador); jugador.colocarAlAzar();
+    } else {
+      const local = red.host && e.bot;
+      const n = new Nave(pil, false, e.nombre, { netId: e.id, remoto: !local, esPersona: !e.bot, equipo: e.equipo || {} });
+      n.bando = e.bando; n.vidas = info.vidas;
+      naves.push(n);
+      if (local) { n.colocarAlAzar(); n.cdDisparo = 2 + Math.random() * 2; } else n.obj.visible = false;
+    }
+  }
+  totalPersonas = info.naves.length;
+  jugador.invulnerable = 3;
+  tFin = 0; gemasPartida = 0; vivasAntes = -1;
+  crearCristales();
+  $('btnEscudo').style.display = jugador.burbuja ? '' : 'none';
+  $('municion').style.display = ['rapido', 'ametralladora'].includes(jugador.equipo.tirador) ? '' : 'none';
+  $('btnMisil').style.display = jugador.equipo.misiles ? '' : 'none';
+  $('btnMisil').textContent = jugador.equipo.misiles === 'arcoiris' ? '🌈' : '🚀';
+  $('btnTurbo10').style.display = jugador.equipo.elitras === 'avanzadas' ? '' : 'none';
+  const cop = copilotoActual();
+  $('btnEspecial2').style.display = cop ? '' : 'none';
+  jugador.copiloto = cop; jugador.cdEspecial2 = 4;
+  if (cop) $('btnEspecial2').innerHTML = `<img src="img/pilotos/${cop.id}.png" alt="">`;
+  $('feed').innerHTML = '';
+  $('mensaje').innerHTML = `¡A LUCHAR!<br><small>EN LÍNEA · ${info.formas ? 'Mundo de ' + info.dueno : mundoActual.nombre}${modoEquipos ? ' · EQUIPOS' : ''}</small>`;
+  setTimeout(() => { if ($('mensaje').textContent.startsWith('¡A LUCHAR!')) $('mensaje').textContent = ''; }, 2500);
+  posicionarCamara(true);
+  estado = 'jugando';
+  mostrar('hud');
+  actualizarHUD();
+}
+
+// ---------- pantalla de la sala ----------
+function datosMios() {
+  return { nombre: ajustes.nombre || pilotoPorId(ajustes.piloto).nombre, piloto: ajustes.piloto, equipo: equipoValido() };
+}
+const callbacksRed = {
+  onSala: () => { if (estado === 'sala' || estado === 'enLinea') { estado = 'sala'; mostrar('sala'); pintarSala(); } },
+  onInicio: (info) => nuevaPartidaRed(info),
+  onEstado: (lista) => aplicarEstados(lista),
+  onEvento: (ev) => alEventoRed(ev),
+  onASala: () => { if (estado === 'fin' || estado === 'jugando') { estado = 'sala'; mostrar('sala'); pintarSala(); } },
+  onError: (txt) => { $('estadoRed').textContent = txt; if (estado === 'sala') { estado = 'enLinea'; mostrar('enLinea'); } },
+  onCerrado: (txt) => { estado = 'enLinea'; mostrar('enLinea'); $('estadoRed').textContent = txt; },
+};
+function abrirEnLinea() {
+  estado = 'enLinea'; mostrar('enLinea');
+  $('estadoRed').textContent = ajustes.nombre ? `Vas a jugar como ${ajustes.nombre}` : 'Tip: pon tu nombre en EDITAR SU NOMBRE';
+}
+function pintarSala() {
+  $('codigoSala').textContent = red.codigo || '····';
+  $('listaJugadores').innerHTML = red.sala.map((j, i) => `<div class="jug"><img src="img/pilotos/${pilotoPorId(j.piloto).id}.png" alt=""><span>${i === 0 ? '👑 ' : ''}${j.nombre}${j.id === red.miId ? ' (tú)' : ''}</span></div>`).join('')
+    + `<div class="jug vacio">${red.sala.length}/${MAX_JUGADORES} jugadores</div>`;
+  const a = red.ajustes;
+  $('salaModo').textContent = a.modo === 'equipos' ? 'EQUIPOS' : 'TODOS CONTRA TODOS';
+  $('salaBots').textContent = a.bots;
+  $('salaVidas').textContent = a.vidas;
+  document.querySelectorAll('.solo-host').forEach(el => el.classList.toggle('bloqueado', !red.host));
+  $('btnEmpezar').style.display = red.host ? '' : 'none';
+  $('esperaHost').style.display = red.host ? 'none' : '';
+}
+function armarPartidaHost() {
+  const a = red.ajustes;
+  const lista = red.sala.map((j, i) => ({ id: j.id, nombre: j.nombre, piloto: j.piloto, equipo: j.equipo, bot: false, bando: a.modo === 'equipos' ? i % 2 : i }));
+  const usados = {};
+  for (let i = 0; i < a.bots; i++) {
+    const pil = PILOTOS[(i + 3) % PILOTOS.length];
+    usados[pil.id] = (usados[pil.id] || 0) + 1;
+    lista.push({ id: `bot-${i}`, nombre: `${pil.nombre} (bot)${usados[pil.id] > 1 ? ' ' + usados[pil.id] : ''}`, piloto: pil.id, bot: true,
+      bando: a.modo === 'equipos' ? (red.sala.length + i) % 2 : 100 + i });
+  }
+  const formas = $('salaMiMundo').classList.contains('sel') ? cargarMundo() : null;
+  empezarPartida({ naves: lista, vidas: a.vidas, modo: a.modo, semilla: Math.floor(Math.random() * 1e9),
+    mundo: Math.floor(Math.random() * MUNDOS.length), formas: formas && formas.length ? formas : null, dueno: red.sala[0].nombre });
+}
+
+$('btnEnLinea').addEventListener('click', () => { iniciarAudio(); sonido('click'); abrirEnLinea(); });
+$('btnCerrarEnLinea').addEventListener('click', () => { sonido('click'); salirRed(); irAlMenu(); });
+$('btnCrearSala').addEventListener('click', () => {
+  sonido('click'); $('estadoRed').textContent = 'Creando sala...';
+  crearSala(datosMios(), callbacksRed);
+});
+$('btnUnirse').addEventListener('click', () => {
+  const cod = $('inputCodigo').value.trim().toUpperCase();
+  if (cod.length !== 4) { sonido('golpe'); $('estadoRed').textContent = 'El código tiene 4 letras'; return; }
+  sonido('click'); $('estadoRed').textContent = `Buscando la sala ${cod}...`;
+  $('inputCodigo').blur();
+  unirse(cod, datosMios(), callbacksRed);
+});
+$('inputCodigo').addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') $('btnUnirse').click(); });
+$('btnSalirSala').addEventListener('click', () => { sonido('click'); salirRed(); abrirEnLinea(); $('estadoRed').textContent = 'Saliste de la sala'; });
+$('btnEmpezar').addEventListener('click', () => {
+  if (!red.host) return;
+  if (red.sala.length + red.ajustes.bots < 2) { sonido('golpe'); $('esperaHost').style.display = ''; $('esperaHost').textContent = 'Se necesita al menos otro jugador o un bot'; return; }
+  sonido('click'); armarPartidaHost();
+});
+for (const b of document.querySelectorAll('[data-sala]')) b.addEventListener('click', () => {
+  if (!red.host) return;
+  sonido('click');
+  const a = red.ajustes, d = Number(b.dataset.d);
+  if (b.dataset.sala === 'modo') a.modo = a.modo === 'equipos' ? 'todos' : 'equipos';
+  if (b.dataset.sala === 'bots') a.bots = (a.bots + d + 13) % 13;
+  if (b.dataset.sala === 'vidas') a.vidas = Math.min(9, Math.max(1, a.vidas + d));
+  enviarSala();
+});
+$('salaMiMundo').addEventListener('click', () => {
+  if (!red.host) return;
+  const m = cargarMundo();
+  if (!m || !m.length) { sonido('golpe'); $('salaMiMundo').textContent = 'MI MUNDO: créalo primero en JUGAR'; return; }
+  sonido('click'); $('salaMiMundo').classList.toggle('sel');
+  $('salaMiMundo').textContent = $('salaMiMundo').classList.contains('sel') ? 'MUNDO: EL MÍO ✓' : 'MUNDO: AL AZAR';
+});

@@ -39,7 +39,7 @@
       <button class="bar opt" id="btnNombre"><span id="nombreJugador">EDITAR SU NOMBRE</span></button>
       <button class="bar opt editar" id="btnEditar"><span>EDITAR NAVE</span></button>
       <button class="bar opt tiendaBtn" id="btnTienda"><span>TIENDA <i id="gemasMenu">💎 0</i></span></button>
-      <div class="bar opt pronto"><span>JUGAR EN LÍNEA</span></div>
+      <button class="bar opt enlineaBtn" id="btnEnLinea"><span>JUGAR EN LÍNEA</span></button>
       <button class="bar opt actualizar" id="btnActualizar"><span id="txtActualizar">BUSCAR ACTUALIZACIONES</span></button>
     </div>
     <button class="bar salir" id="btnSalir"><span>SALIR DEL JUEGO</span></button>
@@ -65,6 +65,42 @@
       <div class="estrellas"><i></i><i></i><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>
       <div class="tm-nombre">MUNDO AL AZAR</div><div class="tm-sub">cada partida es distinta</div>
     </button>
+  </div>
+</section>
+
+<!-- JUGAR EN LÍNEA -->
+<section id="enLinea" class="screen">
+  <div class="titulo-mundo">EN LÍNEA</div>
+  <button class="cerrar-mundo" id="btnCerrarEnLinea">✕</button>
+  <div class="enlinea-cajas">
+    <div class="caja-red">
+      <div class="red-titulo">CREAR SALA</div>
+      <div class="red-desc">Tú eres el anfitrión: eliges los bots, las vidas y el modo</div>
+      <button class="bar jugar" id="btnCrearSala"><span>CREAR</span></button>
+    </div>
+    <div class="caja-red">
+      <div class="red-titulo">UNIRSE</div>
+      <input id="inputCodigo" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="CÓDIGO">
+      <button class="bar jugar" id="btnUnirse"><span>ENTRAR</span></button>
+    </div>
+  </div>
+  <div id="estadoRed"></div>
+</section>
+
+<!-- SALA -->
+<section id="sala" class="screen">
+  <div class="sala-codigo">SALA <b id="codigoSala">····</b></div>
+  <div class="sala-col">
+    <div id="listaJugadores"></div>
+  </div>
+  <div class="sala-col derecha">
+    <div class="bar opt solo-host" data-sala="modo" data-d="1"><span>MODO: <i id="salaModo">TODOS CONTRA TODOS</i></span></div>
+    <div class="bar opt solo-host"><span><b data-sala="bots" data-d="-1">&lt;</b> BOTS <i id="salaBots">4</i> <b data-sala="bots" data-d="1">&gt;</b></span></div>
+    <div class="bar opt solo-host"><span><b data-sala="vidas" data-d="-1">&lt;</b> VIDAS <i id="salaVidas">5</i> <b data-sala="vidas" data-d="1">&gt;</b></span></div>
+    <button class="bar opt solo-host" id="salaMiMundo"><span>MUNDO: AL AZAR</span></button>
+    <button class="bar jugar" id="btnEmpezar"><span>EMPEZAR</span></button>
+    <div id="esperaHost">Esperando que el anfitrión empiece...</div>
+    <button class="bar salir" id="btnSalirSala"><span>SALIR DE LA SALA</span></button>
   </div>
 </section>
 
@@ -181,6 +217,7 @@
     setTimeout(function () { if (!window.__juegoListo) mostrar('El juego no terminó de cargar.'); }, 6000);
   })();
 </script>
+<script src="lib/peerjs.min.js"></script>
 <script type="module" src="game.js"></script>
 </body>
 </html>

@@ -270,3 +270,27 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 #btnBorrarForma.activo { background: #ffd83b; color: #111; animation: parpadeo 1s infinite; }
 #btnProbarMundo { background: #4bd16b; }
 #btnGuardarMundo { background: #4e0a66; color: #fff; }
+
+/* ---------- EN LÍNEA ---------- */
+.bar.enlineaBtn { background: #3fa8ff; }
+#enLinea, #sala { background: #39243f; }
+.enlinea-cajas { position: absolute; left: 6vw; right: 6vw; top: 24vh; bottom: 16vh; display: flex; gap: 4vw; }
+.caja-red { flex: 1; border: .8vh solid #fff; border-radius: 2vh; padding: 3vh 2vw; display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; gap: 2vh; color: #fff; text-align: center; }
+.red-titulo { font-size: 7vh; color: #c77de6; }
+.red-desc { font-size: 3.4vh; font-family: sans-serif; }
+#inputCodigo { font-family: inherit; font-size: 9vh; text-align: center; letter-spacing: 2vw; border-radius: 12px; border: .6vh solid #111; padding: 0; text-transform: uppercase; user-select: text; -webkit-user-select: text; }
+#estadoRed { position: absolute; bottom: 4vh; left: 0; right: 0; text-align: center; color: #ffd83b; font-size: 4vh; text-shadow: 2px 2px 0 #000; }
+.sala-codigo { position: absolute; top: 2vh; left: 0; right: 0; text-align: center; color: #fff; font-size: 7vh; }
+.sala-codigo b { color: #ffd83b; letter-spacing: 1vw; font-size: 1.4em; }
+.sala-col { position: absolute; top: 17vh; bottom: 3vh; left: 3vw; width: 44vw; overflow-y: auto; }
+.sala-col.derecha { left: auto; right: 3vw; width: 44vw; display: flex; flex-direction: column; gap: 1.6vh; }
+.sala-col.derecha .bar { min-height: 9vh; font-size: 3.8vh; }
+.sala-col.derecha .bar b { padding: 0 2vw; }
+.sala-col.derecha i { font-style: normal; }
+#listaJugadores { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2vh 1.5vw; }
+.jug { background: #9d33c4; border: .5vh solid #111; border-radius: 12px; display: flex; align-items: center; gap: 1vw; padding: .6vh 1vw; color: #fff; font-size: 3.4vh; text-shadow: 2px 2px 0 #000; min-height: 9vh; }
+.jug img { height: 7vh; width: 7vh; object-fit: contain; }
+.jug.vacio { background: transparent; border-style: dashed; color: #c9b3d6; justify-content: center; }
+.bloqueado { opacity: .55; pointer-events: none; }
+#salaMiMundo.sel { background: #ffd83b; }
+#esperaHost { color: #ffd83b; text-align: center; font-size: 3.6vh; }
